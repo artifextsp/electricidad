@@ -1,0 +1,1958 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Planta de Energía TSP</title>
+<style>
+:root{
+  --bg:#0b1020;--panel:#111936;--card:#17224b;--card2:#1d2a5c;
+  --line:#28356a;--txt:#e9edff;--mut:#9aa6d6;
+  --v:#ff5a6a;--i:#3fc1ff;--r:#ffb13b;--p:#ffe14d;
+  --ok:#3ee08f;--vio:#b98cff;
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--txt);font-family:var(--font)}
+body{overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+
+.app{display:grid;grid-template-columns:minmax(0,1fr) 380px;height:100%}
+.stage{position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#16204a 0%,#0b1020 70%)}
+.stage canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+
+/* Herramientas */
+.tools{position:absolute;left:12px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;z-index:5}
+.tools button{display:flex;align-items:center;gap:8px;background:rgba(23,34,75,.92);border:1px solid var(--line);color:var(--mut);border-radius:12px;padding:9px 12px;font-size:13px;transition:.15s;backdrop-filter:blur(4px)}
+.tools button svg{width:18px;height:18px;flex:none}
+.tools button:hover{color:var(--txt);border-color:#3a4a8f}
+.tools button.on{background:var(--card2);color:var(--txt);border-color:var(--i);box-shadow:0 0 14px rgba(63,193,255,.3)}
+.tools button[data-tool=fault].on{border-color:var(--v);box-shadow:0 0 14px rgba(255,90,106,.35)}
+
+/* Vistas */
+.views{position:absolute;right:12px;top:12px;display:flex;gap:6px;z-index:5;flex-wrap:wrap;justify-content:flex-end}
+.views button{background:rgba(23,34,75,.92);border:1px solid var(--line);color:var(--mut);border-radius:9px;padding:7px 12px;font-size:12px;font-weight:600;letter-spacing:.3px}
+.views button:hover{color:var(--txt)}
+.views button.on{background:var(--card2);color:var(--txt);border-color:var(--p)}
+.zoombar{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:6px;z-index:5}
+.zoombar button{width:36px;height:36px;border-radius:10px;background:rgba(23,34,75,.92);border:1px solid var(--line);color:var(--txt);font-size:18px}
+
+.hintbar{position:absolute;left:12px;top:12px;background:rgba(17,25,54,.88);border:1px solid var(--line);border-radius:10px;padding:7px 16px;font-size:12.5px;color:var(--mut);z-index:4;pointer-events:none;white-space:nowrap;max-width:calc(100% - 480px);overflow:hidden;text-overflow:ellipsis}
+.hintbar b{color:var(--txt)}
+.legend{position:absolute;left:12px;bottom:12px;background:rgba(17,25,54,.88);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:11.5px;color:var(--mut);z-index:4;pointer-events:none;display:grid;grid-template-columns:auto auto;gap:3px 14px}
+.legend i{display:inline-block;width:18px;height:4px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.legend .dot{width:8px;height:8px;border-radius:50%;background:#9be4ff;box-shadow:0 0 6px #3fc1ff}
+.clean .hintbar,.clean .legend,.clean .tip{display:none!important}
+
+.tip{position:absolute;z-index:8;pointer-events:none;background:rgba(17,25,54,.96);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:12px;line-height:1.5;color:var(--mut);max-width:270px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.tip b{color:var(--txt);font-size:13px}
+.tip .k{color:var(--txt);font-variant-numeric:tabular-nums}
+
+.toast{position:absolute;left:50%;top:58px;transform:translateX(-50%) translateY(-10px);background:rgba(120,22,34,.95);border:1px solid var(--v);border-radius:12px;padding:10px 18px;font-size:13px;line-height:1.45;color:#fff;z-index:20;opacity:0;pointer-events:none;transition:.25s;max-width:min(520px,90%);text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.info{background:rgba(18,54,92,.95);border-color:var(--i)}
+
+.evac{position:absolute;left:50%;top:52px;transform:translateX(-50%);background:#c2182b;color:#fff;font-weight:800;letter-spacing:1px;padding:8px 18px;border-radius:10px;z-index:6;display:none;font-size:14px;white-space:nowrap;box-shadow:0 0 30px rgba(255,40,60,.6);animation:blink 1s steps(2) infinite}
+.evac small{font-weight:600;letter-spacing:0;opacity:.9;margin-left:8px}
+@keyframes blink{50%{background:#7a0f1b}}
+.caption{position:absolute;left:50%;bottom:58px;transform:translateX(-50%);width:min(640px,calc(100% - 120px));background:linear-gradient(135deg,rgba(60,40,110,.95),rgba(25,35,85,.95));border:1px solid var(--vio);border-radius:14px;padding:12px 16px;font-size:14px;line-height:1.5;z-index:6;display:none}
+.caption b{color:var(--vio)}
+.caption .nav{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+.caption button{background:var(--vio);border:none;border-radius:8px;padding:6px 14px;color:#fff;font-weight:600;font-size:13px}
+.caption button.sec{background:rgba(255,255,255,.1)}
+
+/* Panel */
+.panel{background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:18px 16px 40px;display:flex;flex-direction:column;gap:14px}
+.panel::-webkit-scrollbar{width:7px}.panel::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+.kicker{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--i);font-weight:700}
+.panel h1{font-size:21px;line-height:1.2;margin-top:4px}
+.sub{font-size:13px;line-height:1.5;color:var(--mut);margin-top:6px}
+.m-l{color:var(--p);font-weight:700}.m-m{color:var(--ok);font-weight:700}.m-s{color:var(--vio);font-weight:700}.m-t{color:var(--v);font-weight:700}
+.panel h3{font-size:11.5px;letter-spacing:1.1px;text-transform:uppercase;color:var(--mut);font-weight:700;margin-bottom:8px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+
+.sw{display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;padding:6px 0}
+.sw .knob{width:46px;height:26px;border-radius:13px;background:#2a3566;position:relative;flex:none;transition:.2s;border:1px solid var(--line)}
+.sw .knob::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#8a94c4;transition:.2s}
+.sw.on .knob{background:var(--ok);border-color:var(--ok)}
+.sw.on .knob::after{left:23px;background:#fff}
+.sw.trip .knob{background:var(--v);border-color:var(--v)}
+.sw b{display:block;font-size:14px}
+.sw small{display:block;font-size:12px;color:var(--mut)}
+.sw.trip small{color:#ff9aa5}
+.slider{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;padding:6px 0}
+.slider label{font-size:13px}
+.slider output{font-size:13px;color:var(--i);font-weight:700;font-variant-numeric:tabular-nums}
+.slider input{grid-column:1/-1;width:100%;accent-color:var(--i)}
+.repair{display:none;margin-top:6px;width:100%;background:rgba(255,90,106,.15);border:1px solid var(--v);border-radius:9px;padding:8px;color:#ffc2c8;font-size:13px;font-weight:600}
+
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.card{background:var(--card);border-radius:11px;padding:9px 11px;border-top:3px solid}
+.card.cv{border-color:var(--v)}.card.ci{border-color:var(--i)}.card.cr{border-color:var(--r)}.card.cp{border-color:var(--p)}
+.card small{display:block;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--mut)}
+.card b{display:block;font-size:20px;margin-top:2px;font-variant-numeric:tabular-nums}
+.card em{font-style:normal;font-size:11px;color:var(--mut)}
+
+.chain{display:flex;flex-direction:column;gap:7px}
+.chain .row{display:grid;grid-template-columns:110px 1fr 62px;gap:8px;align-items:center;font-size:12px}
+.chain .row span{color:var(--mut)}
+.chain .bar{height:8px;border-radius:4px;background:#0d1430;overflow:hidden}
+.chain .bar i{display:block;height:100%;border-radius:4px;transition:width .3s}
+.chain .row b{text-align:right;font-variant-numeric:tabular-nums;font-size:12px}
+.chain .note{font-size:11.5px;color:var(--mut);line-height:1.45}
+
+.mbar{display:flex;height:16px;border-radius:8px;overflow:hidden;background:#0d1430}
+.mbar i{display:block;height:100%;transition:width .3s}
+.mleg{display:grid;grid-template-columns:1fr 1fr;gap:5px 10px;margin-top:9px;font-size:12px}
+.mleg div{display:flex;align-items:center;gap:6px;color:var(--mut)}
+.mleg div b{margin-left:auto;color:var(--txt);font-variant-numeric:tabular-nums}
+.mleg span.sq{width:10px;height:10px;border-radius:3px;flex:none}
+
+.circs{display:flex;flex-direction:column;gap:6px}
+.circ{display:grid;grid-template-columns:6px 1fr auto;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:9px 10px 9px 0;overflow:hidden;cursor:pointer}
+.circ.sel{border-color:var(--p)}
+.circ .cdot{width:6px;align-self:stretch;background:var(--c)}
+.circ b{font-size:13px;display:block}
+.circ small{font-size:11px;color:var(--mut)}
+.circ .rd{display:block;font-size:11.5px;color:var(--i);font-variant-numeric:tabular-nums;margin-top:2px}
+.circ .rd.off{color:#6d78a8}
+.bulbs{display:flex;gap:5px;margin-top:6px}
+.bulbs button{font-size:11px;padding:3px 8px;border-radius:7px;background:#2a2410;border:1px solid #6b5a1c;color:var(--p)}
+.bulbs button.out{background:#1a1f38;border-color:var(--line);color:#6d78a8;text-decoration:line-through}
+.mini{width:40px;height:22px;border-radius:11px;background:#2a3566;border:1px solid var(--line);position:relative;flex:none}
+.mini::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#8a94c4;transition:.15s}
+.mini.on{background:var(--ok);border-color:var(--ok)}
+.mini.on::after{left:20px;background:#fff}
+
+.insp{font-size:12.5px;line-height:1.55;color:var(--mut)}
+.insp b{color:var(--txt)}
+.insp .kv{display:grid;grid-template-columns:1fr auto;gap:2px 10px;margin:6px 0;font-variant-numeric:tabular-nums}
+.insp .kv span:nth-child(even){color:var(--txt);text-align:right}
+
+#mon{width:100%;aspect-ratio:16/10;border-radius:9px;display:block;background:#05070c;border:3px solid #232a3c}
+
+.diag{list-style:none;display:flex;flex-direction:column;gap:6px}
+.diag li{display:grid;grid-template-columns:20px 1fr;gap:8px;background:var(--card);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.5;color:var(--mut)}
+.diag li b{color:var(--txt)}
+.diag li::before{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800}
+.diag li.ok::before{content:"✓";background:rgba(62,224,143,.16);color:var(--ok)}
+.diag li.warn::before{content:"!";background:rgba(255,177,59,.16);color:var(--r)}
+.diag li.bad::before{content:"✕";background:rgba(255,90,106,.16);color:var(--v)}
+.diag li.info::before{content:"i";background:rgba(63,193,255,.16);color:var(--i)}
+
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.presets button{text-align:left;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:9px 10px;font-size:11.5px;color:var(--mut);line-height:1.35}
+.presets button b{display:block;font-size:13px;color:var(--txt);margin-bottom:2px}
+.presets button:hover{border-color:var(--i);background:var(--card2)}
+
+.tour{background:linear-gradient(135deg,rgba(185,140,255,.14),rgba(63,193,255,.06));border:1px solid var(--vio);border-radius:12px;padding:12px}
+.tour p{font-size:13px;line-height:1.5;color:var(--mut);margin-bottom:10px}
+.tour .btns{display:flex;gap:7px}
+.tour button{background:var(--vio);border:none;border-radius:9px;padding:7px 14px;color:#fff;font-weight:600;font-size:13px}
+.tour button.sec{background:var(--card);border:1px solid var(--line);color:var(--mut)}
+.dots{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap}
+.dots i{width:16px;height:4px;border-radius:2px;background:var(--line)}
+.dots i.on{background:var(--vio)}
+
+.opts{display:flex;flex-direction:column;gap:7px}
+.chk{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--mut);cursor:pointer;user-select:none}
+.chk input{accent-color:var(--i);width:16px;height:16px}
+.seg{display:flex;background:#0d1430;border:1px solid var(--line);border-radius:9px;padding:3px;gap:3px}
+.seg button{flex:1;background:none;border:none;border-radius:7px;padding:6px;font-size:12px;color:var(--mut)}
+.seg button.on{background:var(--card2);color:var(--txt)}
+
+.fact{background:var(--card);border-radius:12px;padding:12px;border-left:3px solid var(--p)}
+.fact p{font-size:12.5px;line-height:1.6;color:var(--mut)}
+.fact button{margin-top:8px;background:none;border:none;color:var(--p);font-size:12.5px;font-weight:600;padding:0}
+.keys{font-size:11.5px;color:#6d78a8;line-height:1.6}
+
+@media (max-width:900px){
+  body{overflow:auto}
+  .app{grid-template-columns:1fr;height:auto}
+  .stage{height:70vh;min-height:420px}
+  .panel{border-left:none;border-top:1px solid var(--line)}
+  .hintbar{display:none}
+  .legend{display:none}
+}
+@media (max-width:520px){
+  .tools button span{display:none}
+  .tools button{padding:9px}
+  .views button{padding:6px 8px;font-size:11px}
+  .caption{bottom:12px;width:calc(100% - 24px);font-size:13px}
+  .evac{font-size:12px}
+  .evac small{display:none}
+}
+@media (prefers-reduced-motion:reduce){.evac{animation:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage" id="stage">
+    <canvas id="cv" role="img" aria-label="Planta industrial isométrica: una hidroeléctrica con turbina y generador alimenta una fábrica con luces en serie y en paralelo, un motor con banda transportadora, una alarma de evacuación y un circuito cerrado de televisión"></canvas>
+
+    <div class="tools" id="tools">
+      <button data-tool="switch" class="on" title="Encender o apagar circuitos tocando los equipos (1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v9"/><path d="M6.3 7.3a8 8 0 1 0 11.4 0"/></svg><span>Interruptor</span></button>
+      <button data-tool="bulb" title="Quitar o poner bombillas (2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg><span>Bombilla</span></button>
+      <button data-tool="inspect" title="Inspeccionar un equipo (3)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg><span>Inspeccionar</span></button>
+      <button data-tool="fault" title="Provocar un cortocircuito en un equipo (4)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><span>Cortocircuito</span></button>
+    </div>
+
+    <div class="views">
+      <button data-view="3d" class="on" title="Vista 3D">3D</button>
+      <button data-view="iso" title="Vista isométrica">ISO</button>
+      <button data-view="top" title="Vista en planta">PLANTA</button>
+      <button id="lblBtn" class="on" aria-pressed="true" title="Mostrar u ocultar etiquetas (E)">🏷 ETIQUETAS</button>
+      <button id="fsBtn" title="Pantalla completa (F)">⛶</button>
+    </div>
+    <div class="zoombar">
+      <button id="zIn" title="Acercar" aria-label="Acercar">+</button>
+      <button id="zOut" title="Alejar" aria-label="Alejar">−</button>
+      <button id="zHome" title="Ver toda la planta" aria-label="Ver toda la planta">⌂</button>
+    </div>
+
+    <div class="hintbar" id="hint">Arrastra: <b>rotar</b> · Shift: <b>mover</b> · Rueda: <b>zoom</b> · Toca un equipo para <b>encenderlo o apagarlo</b></div>
+    <div class="legend" id="legend">
+      <div><i style="background:#3fc1ff"></i>Alimentación general</div>
+      <div><i style="background:#ffe14d"></i>Circuito en serie</div>
+      <div><i style="background:#3ee08f"></i>Luces en paralelo</div>
+      <div><i style="background:#ffb13b"></i>Motor</div>
+      <div><i style="background:#ff5a6a"></i>Alarma</div>
+      <div><i style="background:#b98cff"></i>CCTV / video</div>
+      <div><i style="background:#4a5274"></i>Sin voltaje</div>
+      <div><i class="dot"></i>Flujo de energía</div>
+    </div>
+    <div class="evac" id="evac">⚠ EVACUACIÓN<small id="evacN"></small></div>
+    <div class="caption" id="caption"><div id="capTxt"></div><div class="nav"><button class="sec" id="capPrev">◀ Anterior</button><button class="sec" id="capEnd">Salir</button><button id="capNext">Siguiente ▶</button></div></div>
+    <div class="tip" id="tip"></div>
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <aside class="panel" id="panel">
+    <header>
+      <div class="kicker">TSP Academy · Simulador de energía</div>
+      <h1>Planta industrial de energía</h1>
+      <p class="sub">La <b>energía</b> es una fuerza que se manifiesta como <span class="m-l">luz</span>, <span class="m-m">movimiento</span>, <span class="m-s">sonido</span> y <span class="m-t">temperatura</span>. Síguela desde el agua hasta cada máquina.</p>
+    </header>
+
+    <section class="box">
+      <h3>Fuente · Hidroeléctrica</h3>
+      <div class="slider">
+        <label for="q">💧 Caudal de agua (compuerta)</label><output id="qOut">25 L/s</output>
+        <input type="range" id="q" min="0" max="40" step="1" value="25">
+      </div>
+      <div class="sw on" id="swGen" role="switch" aria-checked="true" tabindex="0"><span class="knob"></span><div><b>⚡ Generador</b><small id="genTxt">—</small></div></div>
+      <div class="sw on" id="swBrk" role="switch" aria-checked="true" tabindex="0"><span class="knob"></span><div><b>🔲 Breaker principal</b><small id="brkTxt">—</small></div></div>
+      <button class="repair" id="repair">🔧 Reparar el cable dañado</button>
+    </section>
+
+    <div class="cards">
+      <div class="card cv"><small>Voltaje fábrica</small><b id="cV">—</b><em id="cV2"></em></div>
+      <div class="card ci"><small>Corriente total</small><b id="cI">—</b><em id="cI2"></em></div>
+      <div class="card cr"><small>Resistencia equiv.</small><b id="cR">—</b><em>circuitos en paralelo</em></div>
+      <div class="card cp"><small>Potencia usada</small><b id="cP">—</b><em id="cP2"></em></div>
+    </div>
+
+    <section class="box">
+      <h3>Cadena de transformaciones</h3>
+      <div class="chain" id="chain"></div>
+    </section>
+
+    <section class="box">
+      <h3>¿En qué se convierte la energía?</h3>
+      <div class="mbar" id="mbar"></div>
+      <div class="mleg" id="mleg"></div>
+    </section>
+
+    <section>
+      <h3>Circuitos de la fábrica</h3>
+      <div class="circs" id="circs"></div>
+    </section>
+
+    <section class="box">
+      <h3>Inspector</h3>
+      <div class="insp" id="insp">Elige la herramienta 🔍 <b>Inspeccionar</b> y toca cualquier equipo para ver su voltaje, corriente, potencia y en qué transforma la energía.</div>
+    </section>
+
+    <section class="box">
+      <h3>📺 Monitor de seguridad (CCTV)</h3>
+      <canvas id="mon" width="320" height="200"></canvas>
+    </section>
+
+    <section>
+      <h3>Diagnóstico</h3>
+      <ul class="diag" id="diag"></ul>
+    </section>
+
+    <section>
+      <h3>Escenarios</h3>
+      <div class="presets" id="presets"></div>
+    </section>
+
+    <section class="tour">
+      <h3 style="color:var(--vio)">🎓 Recorrido guiado</h3>
+      <p id="tourTxt">Sigue la energía paso a paso: del agua del embalse hasta la luz, el movimiento y el sonido dentro de la fábrica.</p>
+      <div class="btns"><button id="tourGo">Iniciar recorrido</button><button class="sec" id="tourEnd">Salir</button></div>
+      <div class="dots" id="tourDots"></div>
+    </section>
+
+    <section class="box">
+      <h3>Opciones</h3>
+      <div class="opts">
+        <label class="chk"><input type="checkbox" id="chkL" checked> Etiquetas (tecla E)</label>
+        <label class="chk"><input type="checkbox" id="chkP" checked> Partículas de energía en los cables</label>
+        <div class="seg" id="seg"><button data-m="flow" class="on">Flujo de energía</button><button data-m="ac">Electrones (CA 60 Hz)</button></div>
+        <label class="chk"><input type="checkbox" id="chkX"> Cableado con rayos X</label>
+        <label class="chk"><input type="checkbox" id="chkH" checked> Mostrar calor (temperatura)</label>
+        <label class="chk"><input type="checkbox" id="chkN"> Turno de noche</label>
+        <label class="chk"><input type="checkbox" id="chkS"> Sonidos</label>
+      </div>
+    </section>
+
+    <section class="fact">
+      <h3 style="color:var(--p)">💡 ¿Sabías que…?</h3>
+      <p id="fact"></p>
+      <button id="factNext">Otro dato →</button>
+    </section>
+    <p class="keys">Atajos: <b>1–4</b> herramientas · <b>E</b> etiquetas · <b>B</b> breaker · <b>A</b> alarma · <b>F</b> pantalla completa · <b>H</b> ver toda la planta</p>
+  </aside>
+</div>
+
+<script>
+'use strict';
+/* =========================================================
+   Utilidades
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const TAU = Math.PI * 2;
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const addv = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const nrm = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+const fmtW = w => w >= 1000 ? (w / 1000).toFixed(2) + ' kW' : (w >= 10 ? Math.round(w) : w.toFixed(1)) + ' W';
+const fmtA = i => i < 0.005 ? '0 A' : i < 1 ? i.toFixed(2) + ' A' : i.toFixed(1) + ' A';
+const fmtV = v => Math.round(v) + ' V';
+const fmtR = r => !isFinite(r) ? '∞ Ω' : r >= 1000 ? (r / 1000).toFixed(2) + ' kΩ' : r.toFixed(1) + ' Ω';
+
+/* =========================================================
+   Constantes físicas reales
+   ========================================================= */
+const RHO = 1000;      // densidad del agua kg/m³
+const G = 9.81;        // gravedad m/s²
+const HEAD = 20;       // altura de caída (m)
+const ETA_T = 0.85;    // eficiencia turbina
+const ETA_G = 0.94;    // eficiencia generador
+const V0 = 220;        // voltaje nominal (V)
+const I_BRK = 20;      // capacidad del breaker principal (A)
+const R_FAULT = 0.4;   // resistencia de un cortocircuito (Ω)
+const P_LAMP = 100;    // bombillas incandescentes de 100 W
+const R_LAMP = V0 * V0 / P_LAMP; // 484 Ω
+const FZ = 0.3;        // altura del piso de la fábrica
+
+/* =========================================================
+   Estado
+   ========================================================= */
+const st = {
+  Q: 25, lastQ: 25, genOn: true, brkOn: true, tripped: false, fault: null,
+  labels: true, particles: true, pmode: 'flow', xray: false, heat: true, night: false, sound: false,
+  tool: 'switch', sel: null, hover: null
+};
+const LAMPS = {
+  S1: { c: 'C1', x: 0.5, y: -7.5, z: 2.78, name: 'Bombilla S1', in: true },
+  S2: { c: 'C1', x: -1.5, y: -7.5, z: 2.78, name: 'Bombilla S2', in: true },
+  S3: { c: 'C1', x: -3.5, y: -7.5, z: 2.78, name: 'Bombilla S3', in: true },
+  LH: { c: 'C2', post: [-1, 3], x: -0.3, y: 3, z: 2.85, name: 'Luz del pasillo', in: true },
+  LP: { c: 'C3', post: [13, -9.5], x: 13.7, y: -9.5, z: 2.85, name: 'Luz de producción', in: true },
+  LW: { c: 'C4', post: [9, 5], x: 9.7, y: 5, z: 2.85, name: 'Luz del almacén', in: true }
+};
+for (const k in LAMPS) Object.assign(LAMPS[k], { id: k, V: 0, I: 0, P: 0, b: 0, bs: 0 });
+
+const CIRC = [
+  { id: 'C1', name: 'Sala de control', tag: 'SERIE · 3 bombillas de 100 W', kind: 'series', lamps: ['S1', 'S2', 'S3'], col: '#ffe14d', on: true, icon: '💡' },
+  { id: 'C2', name: 'Luz del pasillo', tag: 'Paralelo · 100 W', kind: 'lamp', lamps: ['LH'], col: '#3ee08f', on: true, icon: '💡' },
+  { id: 'C3', name: 'Luz de producción', tag: 'Paralelo · 100 W', kind: 'lamp', lamps: ['LP'], col: '#3ee08f', on: true, icon: '💡' },
+  { id: 'C4', name: 'Luz del almacén', tag: 'Paralelo · 100 W', kind: 'lamp', lamps: ['LW'], col: '#3ee08f', on: true, icon: '💡' },
+  { id: 'C5', name: 'Motor de la banda', tag: 'Paralelo · 750 W (1 HP)', kind: 'motor', Pn: 750, col: '#ffb13b', on: true, icon: '⚙️' },
+  { id: 'C6', name: 'Alarma de evacuación', tag: 'Paralelo · 40 W (parlante + baliza)', kind: 'alarm', Pn: 40, col: '#ff5a6a', on: false, icon: '🔔' },
+  { id: 'C7', name: 'Circuito cerrado de TV', tag: 'Paralelo · 35 W (cámara + monitor)', kind: 'cctv', Pn: 35, col: '#b98cff', on: true, icon: '📹' }
+];
+const CI = {}; CIRC.forEach(c => { CI[c.id] = c; Object.assign(c, { closed: false, G: 0, I: 0, P: 0, V: 0, R: Infinity }); });
+
+// Resultados eléctricos
+const E = { Ph: 0, Pm: 0, Pav: 0, Vopen: 0, V: 0, Vbus: 0, Itot: 0, Ptot: 0, Req: Infinity, If: 0, sag: false,
+  light: 0, move: 0, sound: 0, heat: 0 };
+
+// Dinámica mecánica
+let omega = 0, wheelA = 0, genA = 0;
+let motorSpd = 0, motorA = 0, beltPos = 0, produced = 0, pistonZ = FZ + 1.75;
+let tripT = 0, T = 0, flowPos = 0;
+const packages = [];
+let alarmActive = false, cctvActive = false;
+
+/* =========================================================
+   Modelo eléctrico (Ley de Ohm + Kirchhoff + límite de potencia del agua)
+   ========================================================= */
+function circuitR(c) {
+  if (c.lamps) {
+    let r = 0;
+    for (const l of c.lamps) { if (!LAMPS[l].in) return Infinity; r += R_LAMP; } // en serie las R se suman
+    return r;
+  }
+  return V0 * V0 / c.Pn;
+}
+function solve(dt) {
+  // Potencia hidráulica P = ρ·g·Q·h
+  E.Ph = RHO * G * (st.Q / 1000) * HEAD;
+  E.Pm = E.Ph * ETA_T;
+  E.Pav = st.genOn ? E.Pm * ETA_G : 0;
+  // La rueda acelera con inercia hacia una velocidad proporcional al caudal
+  const omT = st.Q * 0.11;
+  omega += (omT - omega) * Math.min(1, dt * 0.7);
+  wheelA += omega * dt;
+  genA += omega * dt * 4;
+  E.Vopen = st.genOn ? V0 * clamp(omega / 0.85, 0, 1) : 0;
+
+  // Conductancias de cada rama en paralelo (G = 1/R); la falla va antes del interruptor
+  let Gs = 0;
+  for (const c of CIRC) {
+    c.R = circuitR(c);
+    c.closed = st.brkOn && c.on && isFinite(c.R);
+    c.G = c.closed ? 1 / c.R : 0;
+    Gs += c.G;
+  }
+  const Gf = (st.brkOn && st.fault) ? 1 / R_FAULT : 0;
+  Gs += Gf;
+  // Si la carga pide más potencia de la que entrega el agua, el voltaje cae: P = V²·G
+  const Pnom = E.Vopen * E.Vopen * Gs;
+  let V = E.Vopen;
+  E.sag = false;
+  if (Pnom > E.Pav && Pnom > 0) { V = E.Vopen * Math.sqrt(E.Pav / Pnom); E.sag = true; }
+  E.V = V;
+  E.Vbus = st.brkOn ? V : 0;
+  E.Itot = E.Vbus * Gs;
+  E.Ptot = E.Vbus * E.Vbus * Gs;
+  E.Req = Gs > 0 ? 1 / Gs : Infinity;
+  E.If = E.Vbus * Gf;
+  for (const c of CIRC) {
+    c.I = E.Vbus * c.G; c.P = c.I * E.Vbus; c.V = c.closed ? E.Vbus : 0;
+    if (c.lamps) for (const l of c.lamps) {
+      const L = LAMPS[l];
+      L.I = L.in ? c.I : 0;
+      L.V = L.I * R_LAMP;          // caída de voltaje en cada bombilla
+      L.P = L.I * L.I * R_LAMP;    // P = I²·R
+      L.b = L.P / P_LAMP;
+    }
+  }
+  alarmActive = CI.C6.closed && E.Vbus > 40;
+  cctvActive = CI.C7.closed && E.Vbus > 60;
+
+  // Manifestaciones de la energía (eficiencias aproximadas reales)
+  let li = 0, mo = 0, so = 0, he = 0;
+  for (const c of CIRC) {
+    const p = c.P;
+    if (c.kind === 'series' || c.kind === 'lamp') { li += 0.05 * p; he += 0.95 * p; }
+    else if (c.kind === 'motor') { mo += 0.85 * p; he += 0.15 * p; }
+    else if (c.kind === 'alarm') { so += p * (25 / 40) * 0.02; li += p * (15 / 40) * 0.05; he += p - p * (25 / 40) * 0.02 - p * (15 / 40) * 0.05; }
+    else if (c.kind === 'cctv') { li += 0.07 * p; he += 0.93 * p; }
+  }
+  he += E.If * E.Vbus; // la falla calienta el cable
+  E.light = li; E.move = mo; E.sound = so; E.heat = he;
+
+  // Protección: el breaker se dispara si la corriente supera 20 A
+  if (st.brkOn && E.Itot > I_BRK) { tripT += dt; if (tripT > 0.22) trip(); } else tripT = 0;
+}
+function trip() {
+  st.brkOn = false; st.tripped = true; tripT = 0;
+  burst(faultPt(st.fault || 'C5'), 40);
+  sPop();
+  toast('⚡ ¡El breaker se disparó! Por el cortocircuito pasaban ' + Math.round(E.Itot) + ' A (el límite es 20 A). Cortó la energía para evitar un incendio.');
+  syncUI(true);
+}
+
+/* =========================================================
+   Simulación mecánica: motor, banda, prensa, operarios
+   ========================================================= */
+const PRESS_X = 11;
+function simulate(dt) {
+  T += dt;
+  flowPos += dt * (0.3 + st.Q * 0.05);
+  // Motor: la velocidad sigue al voltaje (V/V0) con inercia
+  const target = CI.C5.closed ? clamp(E.Vbus / V0, 0, 1.1) : 0;
+  motorSpd += (target - motorSpd) * Math.min(1, dt * 1.6);
+  if (motorSpd < 0.003) motorSpd = 0;
+  motorA += motorSpd * dt * 14;
+  const v = motorSpd * 1.3;
+  beltPos += v * dt;
+  // Paquetes
+  for (const p of packages) {
+    p.x += v * dt;
+    if (!p.done && p.x >= PRESS_X) { p.done = true; p.flash = 1; }
+    if (p.flash) p.flash = Math.max(0, p.flash - dt * 2);
+  }
+  for (let i = packages.length - 1; i >= 0; i--) {
+    if (packages[i].x > 16.7) { packages.splice(i, 1); produced++; floaters.push({ x: 16.7, y: -6, z: FZ + 1.6, t: 0, txt: '+1 📦' }); }
+  }
+  const last = packages.length ? Math.min(...packages.map(p => p.x)) : 99;
+  if (v > 0 && last > 8.1) packages.push({ x: 6.4, done: false, flash: 0 });
+  // Pistón de la prensa: baja cuando hay un paquete debajo
+  const under = packages.some(p => Math.abs(p.x - PRESS_X) < 0.32);
+  const pzT = (under && motorSpd > 0.05) ? FZ + 1.33 : FZ + 1.75;
+  pistonZ += (pzT - pistonZ) * Math.min(1, dt * 14);
+  // Operarios
+  for (const w of WORKERS) {
+    const goal = alarmActive ? w.len : 0;
+    const sp = alarmActive ? 2.1 : 1.3;
+    if (Math.abs(goal - w.d) > 0.01) { w.d += Math.sign(goal - w.d) * Math.min(sp * dt, Math.abs(goal - w.d)); w.walk += dt * 9; w.moving = true; }
+    else w.moving = false;
+  }
+  // Partículas de calor
+  if (st.heat) {
+    for (const k in LAMPS) { const L = LAMPS[k]; if (L.b > 0.02 && Math.random() < L.b * dt * 4) heatP.push({ x: L.x + (Math.random() - .5) * .3, y: L.y + (Math.random() - .5) * .3, z: L.z + 0.25, t: 0, s: .6 + L.b }); }
+    if (motorSpd > 0.05 && Math.random() < dt * 2.5 * motorSpd) heatP.push({ x: 4.6 + Math.random() * 1, y: -6, z: FZ + 1.3, t: 0, s: 1 });
+    if (st.fault && st.brkOn && Math.random() < dt * 30) { const f = faultPt(st.fault); heatP.push({ x: f[0], y: f[1], z: f[2] + .1, t: 0, s: 1.4 }); }
+  }
+  for (let i = heatP.length - 1; i >= 0; i--) { const h = heatP[i]; h.t += dt; h.z += dt * 0.7; h.x += Math.sin(T * 3 + i) * dt * 0.15; if (h.t > 1.6) heatP.splice(i, 1); }
+  if (heatP.length > 260) heatP.splice(0, heatP.length - 260);
+  // Chispas de la falla
+  if (st.fault && st.brkOn && Math.random() < dt * 40) burst(faultPt(st.fault), 2);
+  for (let i = sparks.length - 1; i >= 0; i--) { const s = sparks[i]; s.t += dt; s.vz -= 9 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt; if (s.z < FZ) { s.z = FZ; s.vz *= -0.3; } if (s.t > s.life) sparks.splice(i, 1); }
+  for (let i = floaters.length - 1; i >= 0; i--) { const f = floaters[i]; f.t += dt; f.z += dt * 0.8; if (f.t > 1.4) floaters.splice(i, 1); }
+  // Gotas de agua
+  for (const d of drops) { d.u += dt * (0.9 + d.k * 0.4); if (d.u > 1) { d.u -= 1; d.y = -5.4 + Math.random() * 0.8; } }
+  // Fases de partículas en cables
+  for (const e of EDGES) { const I = e.cur(); e.I = I; if (I > 0.002) e.ph += (0.45 + 1.6 * Math.sqrt(Math.min(I, 30) / 3)) * dt; }
+}
+const heatP = [], sparks = [], floaters = [];
+const drops = Array.from({ length: 70 }, (_, i) => ({ u: Math.random(), y: -5.4 + Math.random() * 0.8, k: Math.random(), i }));
+function burst(p, n) {
+  for (let i = 0; i < n; i++) sparks.push({ x: p[0], y: p[1], z: p[2] + 0.05, vx: (Math.random() - .5) * 4, vy: (Math.random() - .5) * 4, vz: 1 + Math.random() * 3.5, t: 0, life: 0.3 + Math.random() * 0.5 });
+}
+const FAULT_PTS = { C1: [0, -2.4], C2: [-1.6, 3], C3: [14, -8.3], C4: [6.5, 5], C5: [5, -3.6], C6: [-0.6, 6.3], C7: [16.4, -4] };
+const faultPt = id => { const p = FAULT_PTS[id] || [0, 0]; return [p[0], p[1], FZ + 0.05]; };
+
+/* Operarios: rutas de evacuación hacia el punto de encuentro */
+const WORKERS = [
+  { name: 'Operaria de la banda', route: [[8, -4.4], [6, -1.5], [2, -1.5], [-2, 1.8], [-4.5, 3.5], [-7.4, 3.5], [-9, 7.2]], col: [240, 150, 40] },
+  { name: 'Operario de la prensa', route: [[12.6, -4.4], [7, -1.7], [2, -1.7], [-2, 2.2], [-4.5, 3.3], [-7.4, 3.3], [-10.2, 8.4]], col: [240, 150, 40] },
+  { name: 'Vigilante de la sala de control', route: [[-3.4, -9.7], [-1.5, -6], [0, -3.6], [0, -2], [-3, 2.5], [-5, 3.6], [-7.4, 3.6], [-9.8, 9.4]], col: [70, 110, 200] },
+  { name: 'Almacenista', route: [[10, 7.2], [6, 5.5], [2, 5.5], [-3, 4.2], [-7.4, 3.8], [-8.4, 8.8]], col: [240, 150, 40] }
+];
+for (const w of WORKERS) {
+  w.seg = []; let L = 0;
+  for (let i = 1; i < w.route.length; i++) { const a = w.route[i - 1], b = w.route[i]; const l = Math.hypot(b[0] - a[0], b[1] - a[1]); w.seg.push({ a, b, l, s: L }); L += l; }
+  w.len = L; w.d = 0; w.walk = 0; w.moving = false;
+}
+function workerPos(w) {
+  let s = w.seg[w.seg.length - 1];
+  for (const g of w.seg) if (w.d <= g.s + g.l) { s = g; break; }
+  const t = clamp((w.d - s.s) / s.l, 0, 1);
+  return [lerp(s.a[0], s.b[0], t), lerp(s.a[1], s.b[1], t), Math.atan2(s.b[1] - s.a[1], s.b[0] - s.a[0])];
+}
+const inFactory = (x, y) => x > -6.3 && x < 18.3 && y > -12.3 && y < 10.3;
+
+/* =========================================================
+   Cámara y proyección 3D
+   ========================================================= */
+const stage = $('stage'), cv = $('cv'), ctx = cv.getContext('2d');
+let W = 1, H = 1, dpr = 1;
+function resize() {
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  const r = stage.getBoundingClientRect();
+  W = Math.max(1, Math.round(r.width * dpr)); H = Math.max(1, Math.round(r.height * dpr));
+  cv.width = W; cv.height = H;
+}
+new ResizeObserver(resize).observe(stage);
+resize();
+
+const VIEWS = { '3d': [0.5, 0.86], 'iso': [Math.PI / 4, 0.6155], 'top': [0, Math.PI / 2] };
+const HOME = { cx: -4, cy: -1.2, zoom: 1.08 };
+if (W / H < 0.85) Object.assign(HOME, { cx: 4, cy: -1, zoom: 1 });
+const cam = { th: 0.5, ph: 0.86, zoom: HOME.zoom, cx: HOME.cx, cy: HOME.cy };
+const camT = { ...cam };
+let cT, sT, cP, sP, S, ox, oy, CAM = [0, 0, 1];
+function setCam() {
+  cT = Math.cos(cam.th); sT = Math.sin(cam.th); cP = Math.cos(cam.ph); sP = Math.sin(cam.ph);
+  CAM = [sT * cP, cT * cP, sP];
+  S = (W / H < 0.85 ? W / 30 : Math.min(W / 52, H / 31)) * cam.zoom;
+  const sx0 = cam.cx * cT - cam.cy * sT, d0 = cam.cx * sT + cam.cy * cT;
+  ox = W / 2 - sx0 * S; oy = H * 0.53 - d0 * sP * S;
+}
+// Proyección (skill TSP): P(x,y,z) → pantalla
+function P(x, y, z = 0) {
+  const sx = x * cT - y * sT, d = x * sT + y * cT;
+  return [ox + sx * S, oy + (d * sP - z * cP) * S];
+}
+// Profundidad hacia la cámara (mayor = más cerca)
+const dk = (x, y, z) => (x * sT + y * cT) * cP + z * sP;
+function angDiff(a, b) { let d = (a - b) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; }
+
+/* =========================================================
+   Primitivas: caras sombreadas, cajas, cilindros, esferas
+   ========================================================= */
+let amb = 1, ambT = 1;
+const LIGHT = nrm([0.35, 0.62, 0.72]);
+const shadeK = n => 0.55 + 0.45 * Math.max(0, dot(n, LIGHT));
+function rgb(c, k = 1, a = 1) {
+  const m = k * amb, tint = (1 - amb) * 34;
+  const r = Math.min(255, c[0] * m) | 0, g = Math.min(255, c[1] * m + tint * 0.25) | 0, b = Math.min(255, c[2] * m + tint) | 0;
+  return a >= 1 ? `rgb(${r},${g},${b})` : `rgba(${r},${g},${b},${a})`;
+}
+function path3(pts) {
+  ctx.beginPath();
+  for (let i = 0; i < pts.length; i++) { const q = P(pts[i][0], pts[i][1], pts[i][2]); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }
+  ctx.closePath();
+}
+function face(pts, n, c, k = 1) {
+  if (n && dot(n, CAM) <= 0.0005) return false;
+  const s = rgb(c, (n ? shadeK(n) : 1) * k);
+  path3(pts); ctx.fillStyle = s; ctx.fill(); ctx.strokeStyle = s; ctx.lineWidth = 1; ctx.stroke();
+  return true;
+}
+function face2(pts, n, c, k = 1) { // cara de doble lado (paletas, pantallas)
+  if (dot(n, CAM) < 0) n = mul(n, -1);
+  return face(pts, n, c, k);
+}
+function box(x0, y0, z0, x1, y1, z1, c, top, k = 1) {
+  face([[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]], [1, 0, 0], c, k);
+  face([[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]], [-1, 0, 0], c, k);
+  face([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [0, 1, 0], c, k);
+  face([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], [0, -1, 0], c, k);
+  face([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], [0, 0, 1], top || c, k);
+}
+function cyl(a, b, r1, r2, c, seg = 14, capC, k = 1) {
+  const u = nrm(sub(b, a)), ref = Math.abs(u[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+  const p1 = nrm(cross(u, ref)), p2 = cross(u, p1);
+  const A = [], B = [], N = [];
+  for (let i = 0; i < seg; i++) {
+    const t = i / seg * TAU, co = Math.cos(t), si = Math.sin(t);
+    const d = [p1[0] * co + p2[0] * si, p1[1] * co + p2[1] * si, p1[2] * co + p2[2] * si];
+    N.push(d); A.push(addv(a, mul(d, r1))); B.push(addv(b, mul(d, r2)));
+  }
+  for (let i = 0; i < seg; i++) { const j = (i + 1) % seg; face([A[i], A[j], B[j], B[i]], nrm(addv(N[i], N[j])), c, k); }
+  if (!face(B, u, capC || c, k)) face(A, mul(u, -1), capC || c, k);
+}
+function sphere(x, y, z, r, c, k = 1) {
+  const q = P(x, y, z), R = r * S;
+  const g = ctx.createRadialGradient(q[0] - R * .35, q[1] - R * .4, R * .1, q[0], q[1], R);
+  g.addColorStop(0, rgb(c, 1.3 * k)); g.addColorStop(1, rgb(c, 0.62 * k));
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q[0], q[1], R, 0, TAU); ctx.fill();
+}
+function line3(a, b, col, w) {
+  const p = P(a[0], a[1], a[2]), q = P(b[0], b[1], b[2]);
+  ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke();
+}
+// Transformación afín para dibujar en el plano del piso (círculos, textos)
+function floorTf(x, y, z) {
+  const c = P(x, y, z), u = P(x + 1, y, z), v = P(x, y + 1, z);
+  ctx.setTransform(u[0] - c[0], u[1] - c[1], v[0] - c[0], v[1] - c[1], c[0], c[1]);
+}
+const resetTf = () => ctx.setTransform(1, 0, 0, 1, 0, 0);
+function floorText(txt, x, y, z, size, col) {
+  // Texto acostado sobre el piso, siempre legible (alineado con la pantalla)
+  const c = P(x, y, z);
+  const ux = [cT, -sT], vx = [sT, cT];
+  const u = P(x + ux[0], y + ux[1], z), v = P(x + vx[0], y + vx[1], z);
+  const k = size / 100;
+  ctx.setTransform((u[0] - c[0]) * k, (u[1] - c[1]) * k, (v[0] - c[0]) * k, (v[1] - c[1]) * k, c[0], c[1]);
+  ctx.font = '800 100px system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = col; ctx.fillText(txt, 0, 0);
+  resetTf();
+}
+
+/* =========================================================
+   Paleta de materiales (inspirada en las referencias)
+   ========================================================= */
+const C = {
+  ground: [52, 74, 70], groundSide: [92, 72, 54], grass: [104, 150, 84], earth: [124, 98, 72],
+  water: [58, 152, 226], concrete: [182, 186, 194], steel: [152, 162, 178], dark: [54, 60, 74], darker: [36, 40, 52],
+  navy: [48, 82, 150], yellow: [246, 188, 44], white: [226, 229, 236], wall: [196, 200, 212], wallTop: [228, 231, 238],
+  slab: [84, 88, 102], fHall: [104, 109, 124], fCtrl: [92, 104, 136], fProd: [96, 100, 114], fWare: [116, 110, 100],
+  wood: [146, 108, 70], cardboard: [204, 156, 100], cardTop: [222, 176, 120], red: [222, 62, 72], skin: [236, 196, 156],
+  pole: [128, 96, 66], glass: [150, 200, 235], shade: [70, 78, 98], trunk: [110, 80, 56], leaf: [86, 150, 92]
+};
+
+/* =========================================================
+   Escena: objetos ordenados por profundidad
+   ========================================================= */
+const OBJ = [];
+const PICKS = [];
+function obj(c, draw) { OBJ.push({ c, draw }); }
+function pick(id, b, ctr) { PICKS.push({ id, b, ctr: ctr || [(b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2] }); }
+const SHADOWS = [];
+
+function buildScene() {
+  /* ---------- Embalse (meseta) y represa ---------- */
+  const PX0 = -31, PX1 = -21.4, PY0 = -12, PY1 = 3, PH = 5;
+  const nx = 6, ny = 10, tw = (PX1 - PX0) / nx, th2 = (PY1 - PY0) / ny;
+  for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+    const x0 = PX0 + i * tw, y0 = PY0 + j * th2, x1 = x0 + tw, y1 = y0 + th2;
+    const border = i === 0 || j === 0 || j === ny - 1;
+    obj([(x0 + x1) / 2, (y0 + y1) / 2, PH / 2], () => {
+      if (border) box(x0, y0, 0, x1, y1, PH, C.earth, C.grass);
+      else {
+        const s = 0.92 + 0.08 * Math.sin(T * 1.6 + x0 * 0.9 + y0 * 1.3);
+        box(x0, y0, 0, x1, y1, PH - 0.12, C.earth, [C.water[0] * s, C.water[1] * s, C.water[2] * s]);
+      }
+    });
+  }
+  pick('res', [PX0, PY0, 0, PX1, PY1, PH]);
+  // Muro de la represa con compuerta
+  const DX0 = -21.4, DX1 = -20.6, DH = 5.6;
+  for (const [y0, y1] of [[-12, -10], [-10, -8], [-8, -5.45], [-4.55, -2], [-2, 0.5], [0.5, 3]])
+    obj([(DX0 + DX1) / 2, (y0 + y1) / 2, DH / 2], () => box(DX0, y0, 0, DX1, y1, DH, C.concrete));
+  obj([-21, -5, 3], () => {
+    box(DX0, -5.45, 0, DX1, -4.55, 4.9, C.concrete);
+    const op = st.Q / 40, zb = 4.9 + op * 0.75;
+    box(DX0 + 0.15, -5.62, 4.9, DX1 - 0.15, -5.45, 6.9, C.yellow);
+    box(DX0 + 0.15, -4.55, 4.9, DX1 - 0.15, -4.38, 6.9, C.yellow);
+    box(DX0 + 0.1, -5.62, 6.75, DX1 - 0.1, -4.38, 7.0, C.yellow);
+    box(DX0 + 0.25, -5.45, zb, DX1 - 0.25, -4.55, zb + 0.8, C.navy);
+    line3([-21, -5, zb + 0.8], [-21, -5, 6.75], rgb([40, 40, 40]), 2 * dpr);
+  });
+  pick('gate', [-21.6, -5.7, 4.6, -20.4, -4.3, 7]);
+  // Canal (vertedero) hacia la turbina
+  obj([-20.1, -5, 4.8], () => {
+    box(-20.6, -5.5, 4.72, -19.65, -4.5, 4.88, C.concrete);
+    if (st.Q > 0) face([[-20.6, -5.42, 4.9], [-19.65, -5.42, 4.9], [-19.65, -4.58, 4.9], [-20.6, -4.58, 4.9]], [0, 0, 1], C.water, 1.05);
+  });
+
+  /* ---------- Turbina (rueda hidráulica) ---------- */
+  const WX = -19, WY = -5, WZ = 2.4, WR = 2;
+  obj([WX, WY, WZ], () => {
+    const parts = [];
+    const yb = CAM[1] >= 0 ? -5.45 : -4.55, yf = CAM[1] >= 0 ? -4.55 : -5.45;
+    const ring = y => {
+      return () => {
+        const pts = [];
+        for (let i = 0; i <= 40; i++) { const a = i / 40 * TAU; pts.push(P(WX + Math.cos(a) * WR, y, WZ + Math.sin(a) * WR)); }
+        ctx.strokeStyle = rgb([95, 105, 125]); ctx.lineWidth = 0.14 * S; ctx.beginPath();
+        pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.stroke();
+        for (let i = 0; i < 6; i++) { const a = wheelA + i / 6 * TAU; line3([WX, y, WZ], [WX + Math.cos(a) * WR, y, WZ + Math.sin(a) * WR], rgb([110, 120, 140]), 0.09 * S); }
+      };
+    };
+    parts.push({ k: dk(WX, yb, WZ) - 2, f: ring(yb) });
+    parts.push({ k: dk(WX, -6.2, 1.2) - (CAM[1] >= 0 ? 3 : -3), f: () => box(WX - .15, -6.15, 0, WX + .15, -5.85, WZ + .1, C.dark) });
+    parts.push({ k: dk(WX, -3.8, 1.2) + (CAM[1] >= 0 ? 3 : -3), f: () => box(WX - .15, -4.15, 0, WX + .15, -3.85, WZ + .1, C.dark) });
+    parts.push({ k: dk(WX, WY, WZ) - 1.5, f: () => cyl([WX, -6.25, WZ], [WX, -2.55, WZ], .13, .13, C.steel, 10) });
+    for (let i = 0; i < 12; i++) {
+      const a = wheelA + i / 12 * TAU, ca = Math.cos(a), sa = Math.sin(a);
+      const r0 = 1.05, r1 = WR + 0.05;
+      const pts = [[WX + ca * r0, -5.42, WZ + sa * r0], [WX + ca * r1, -5.42, WZ + sa * r1], [WX + ca * r1, -4.58, WZ + sa * r1], [WX + ca * r0, -4.58, WZ + sa * r0]];
+      parts.push({ k: dk(WX + ca * 1.5, WY, WZ + sa * 1.5), f: () => face2(pts, [-sa, 0, ca], C.yellow) });
+    }
+    parts.push({ k: dk(WX, yf, WZ) + 2, f: ring(yf) });
+    parts.push({ k: dk(WX, yf, WZ) + 2.1, f: () => cyl([WX, -5.5, WZ], [WX, -4.5, WZ], .38, .38, C.dark, 12) });
+    parts.sort((a, b) => a.k - b.k).forEach(p => p.f());
+  });
+  pick('wheel', [WX - WR, -6.2, 0.3, WX + WR, -3.8, WZ + WR]);
+
+  /* ---------- Generador ---------- */
+  obj([-19, -1, 1.8], () => {
+    box(-20.5, -3, 0, -17.5, 1.2, 0.9, C.concrete);
+    box(-20.1, -2.3, 0.9, -19.7, 0.3, 1.45, C.dark); box(-18.3, -2.3, 0.9, -17.9, 0.3, 1.45, C.dark);
+    cyl([-19, -2.6, 2.4], [-19, 0.7, 2.4], 1.15, 1.15, C.navy, 22, [160, 168, 182]);
+    cyl([-19, -2.2, 2.4], [-19, -1.95, 2.4], 1.2, 1.2, C.yellow, 22);
+    cyl([-19, 0.05, 2.4], [-19, 0.3, 2.4], 1.2, 1.2, C.yellow, 22);
+    // tapa con marcas que giran (rotor visible)
+    const yc = CAM[1] >= 0 ? 0.71 : -2.61;
+    if (Math.abs(CAM[1]) > 0.02) {
+      for (let i = 0; i < 4; i++) { const a = genA + i * Math.PI / 2; line3([-19, yc, 2.4], [-19 + Math.cos(a) * 0.85, yc, 2.4 + Math.sin(a) * 0.85], rgb([60, 66, 80]), 0.1 * S); }
+      sphere(-19, yc, 2.4, 0.16, C.steel);
+    }
+    box(-19.45, -1.25, 3.42, -18.55, -0.35, 3.95, C.dark, [80, 86, 100]);
+    face([[-19.2, -0.34, 3.55], [-18.8, -0.34, 3.55], [-18.8, -0.34, 3.85], [-19.2, -0.34, 3.85]], [0, 1, 0], C.yellow);
+  });
+  SHADOWS.push([-20.5, -3, -17.5, 1.2, 0]);
+  pick('gen', [-20.5, -3, 0, -17.5, 1.2, 3.95]);
+
+  /* ---------- Postes de la línea eléctrica ---------- */
+  const pole = (x, y, h) => obj([x, y, h / 2], () => {
+    box(x - .13, y - .13, 0, x + .13, y + .13, h, C.pole);
+    box(x - .09, y - .8, h - .35, x + .09, y + .8, h - .2, C.pole);
+    for (const yy of [y - .6, y + .6, y]) cyl([x, yy, h - .2], [x, yy, h + .05], .07, .05, [220, 225, 235], 8);
+  });
+  pole(-14.5, 1.8, 5.3); pole(-10, 3.3, 5.3);
+  obj([-6.9, 6.3, 1.8], () => box(-7.02, 6.18, 0, -6.78, 6.42, 3.7, C.steel));
+  pick('line', [-14.8, 1.4, 0, -9.7, 3.7, 5.6], [-12.2, 2.6, 4]);
+
+  /* ---------- Árboles ---------- */
+  for (const [x, y, s] of [[-26, 8, 1], [-29, 10.5, 1.2], [-24, 12.5, .9], [-13, 12, 1.1], [-15.5, -14, 1], [-27.5, -15, 1.2], [21, -15, 1], [21, 13, 1.1], [-31, -1, 1], [-11, -13, .9], [10, 13.5, 1], [3, 13.8, .85]]) {
+    obj([x, y, 1.5 * s], () => {
+      cyl([x, y, 0], [x, y, 0.9 * s], .16 * s, .13 * s, C.trunk, 8);
+      cyl([x, y, 0.6 * s], [x, y, 2.3 * s], 1.0 * s, 0.25 * s, C.leaf, 10);
+      cyl([x, y, 1.6 * s], [x, y, 3.1 * s], 0.7 * s, 0.05 * s, [96, 162, 100], 10);
+    });
+  }
+
+  /* ---------- Muros de la fábrica (corte isométrico) ---------- */
+  const wall = (x0, y0, x1, y1, out) => {
+    const lx = x1 - x0, ly = y1 - y0, alongX = lx >= ly, L = alongX ? lx : ly, n = Math.max(1, Math.ceil(L / 2));
+    for (let i = 0; i < n; i++) {
+      const a = (alongX ? x0 : y0) + L * i / n, b = (alongX ? x0 : y0) + L * (i + 1) / n;
+      const bx = alongX ? [a, y0, b, y1] : [x0, a, x1, b];
+      obj([(bx[0] + bx[2]) / 2, (bx[1] + bx[3]) / 2, 0.8], () => {
+        let h = 1.2;
+        let tall = false;
+        if (out) { const o = out[0] * CAM[0] + out[1] * CAM[1]; tall = o < -0.05; h = tall ? 2.9 : 0.55; }
+        box(bx[0], bx[1], FZ, bx[2], bx[3], FZ + h, C.wall, C.wallTop);
+        if (tall) { // ventanas en la cara interior
+          const nn = [-out[0], -out[1], 0], seg = alongX ? bx[2] - bx[0] : bx[3] - bx[1];
+          const off = 0.012, cnt = Math.max(1, Math.round(seg / 1.1));
+          for (let k = 0; k < cnt; k++) {
+            const t0 = (k + 0.15) / cnt, t1 = (k + 0.85) / cnt, z0 = FZ + 1.15, z1 = FZ + 2.45;
+            let pts;
+            if (alongX) {
+              const yy = out[1] > 0 ? bx[1] - off : bx[3] + off, xa = lerp(bx[0], bx[2], t0), xb = lerp(bx[0], bx[2], t1);
+              pts = [[xa, yy, z0], [xb, yy, z0], [xb, yy, z1], [xa, yy, z1]];
+            } else {
+              const xx = out[0] > 0 ? bx[0] - off : bx[2] + off, ya = lerp(bx[1], bx[3], t0), yb = lerp(bx[1], bx[3], t1);
+              pts = [[xx, ya, z0], [xx, yb, z0], [xx, yb, z1], [xx, ya, z1]];
+            }
+            face(pts, nn, C.glass, 1.05);
+          }
+        }
+      });
+    }
+  };
+  const wallX = (y0, y1, x0, x1, gaps, out) => { let s = x0; for (const [g0, g1] of gaps || []) { if (g0 > s) wall(s, y0, g0, y1, out); s = g1; } if (x1 > s) wall(s, y0, x1, y1, out); };
+  const wallY = (x0, x1, y0, y1, gaps, out) => { let s = y0; for (const [g0, g1] of gaps || []) { if (g0 > s) wall(x0, s, x1, g0, out); s = g1; } if (y1 > s) wall(x0, s, x1, y1, out); };
+  wallX(-12.3, -12.0, -6.3, 18.3, [], [0, -1]);
+  wallX(10.0, 10.3, -6.3, 18.3, [], [0, 1]);
+  wallY(-6.3, -6.0, -12.0, 10.0, [[2, 5]], [-1, 0]);
+  wallY(18.0, 18.3, -12.0, 10.0, [[3, 6]], [1, 0]);
+  wallX(-3.15, -2.85, -6.0, 2.85, [[-1, 1]]);
+  wallY(2.85, 3.15, -12.0, 10.0, [[-2.3, -0.5], [4.4, 6.6]]);
+  wallX(0.85, 1.15, 3.15, 18.0, [[8, 11.5]]);
+
+  /* ---------- Tablero de breakers ---------- */
+  obj([-5.65, 6.3, FZ + 1], () => {
+    box(-5.95, 5.6, FZ, -5.35, 7.0, FZ + 2.0, [176, 182, 192], [200, 205, 214]);
+    if (CAM[0] > 0.02) {
+      const x = -5.34;
+      face([[x, 5.7, FZ + 0.15], [x, 6.9, FZ + 0.15], [x, 6.9, FZ + 1.9], [x, 5.7, FZ + 1.9]], [1, 0, 0], [160, 166, 178]);
+      // breakers de cada circuito
+      CIRC.forEach((c, i) => {
+        const y0 = 5.76 + i * 0.163, live = c.on && st.brkOn && E.Vbus > 1;
+        box(x, y0, FZ + 1.55, x + 0.07, y0 + 0.12, FZ + 1.75, live ? [70, 210, 130] : [70, 76, 92]);
+      });
+      // palanca principal
+      const zH = st.brkOn ? FZ + 1.2 : FZ + 0.85;
+      box(x, 6.1, FZ + 0.75, x + 0.04, 6.5, FZ + 1.4, C.darker);
+      box(x, 6.18, zH - 0.08, x + 0.16, 6.42, zH + 0.08, C.red);
+      // señal de peligro
+      path3([[x + .005, 6.3, FZ + 0.62], [x + .005, 6.05, FZ + 0.25], [x + .005, 6.55, FZ + 0.25]]);
+      ctx.fillStyle = rgb(C.yellow); ctx.fill();
+    }
+    const blink = st.tripped && Math.sin(T * 10) > 0;
+    const ok = st.brkOn && E.Vbus > 1;
+    sphere(-5.65, 6.3, FZ + 2.12, 0.12, ok ? [80, 240, 150] : blink ? [255, 70, 80] : [120, 40, 50]);
+  });
+  SHADOWS.push([-5.95, 5.6, -5.35, 7.0, FZ]);
+  pick('cabinet', [-5.95, 5.6, FZ, -5.2, 7.0, FZ + 2.25]);
+
+  /* ---------- Sala de control: luces en serie + escritorio con monitor ---------- */
+  obj([-1.5, -7.5, 2.2], () => {
+    box(-5.1, -7.6, FZ, -4.9, -7.4, 3.5, C.steel); box(1.9, -7.6, FZ, 2.1, -7.4, 3.5, C.steel);
+    box(-5.15, -7.62, 3.36, 2.15, -7.38, 3.52, C.dark, [90, 98, 118]);
+    for (const id of ['S3', 'S2', 'S1']) drawPendant(LAMPS[id], 3.36);
+  });
+  for (const id of ['S1', 'S2', 'S3']) { const L = LAMPS[id]; pick(id, [L.x - .45, L.y - .45, L.z - .2, L.x + .45, L.y + .45, 3.4], [L.x, L.y, L.z]); }
+
+  obj([-3.4, -11, 1], () => {
+    box(-5.0, -11.6, FZ, -1.8, -10.4, FZ + 0.8, [118, 126, 148], [158, 166, 186]);
+    box(-3.52, -11.28, FZ + 0.8, -3.28, -11.12, FZ + 1.05, C.darker);
+    box(-4.48, -11.26, FZ + 1.0, -2.32, -11.06, FZ + 2.26, C.darker);
+    drawScreen();
+    // consola con luces
+    box(-1.75, -11.6, FZ, -0.4, -10.6, FZ + 1.0, C.white, [190, 196, 208]);
+    if (CAM[1] > 0) for (let i = 0; i < 4; i++) {
+      const on = E.Vbus > 1 && Math.sin(T * 3 + i * 1.7) > 0;
+      sphere(-1.55 + i * 0.3, -10.58, FZ + 0.75, 0.06, on ? [[80, 240, 150], [255, 210, 60], [80, 200, 255], [255, 90, 100]][i] : [60, 64, 80]);
+    }
+  });
+  SHADOWS.push([-5.0, -11.6, -0.4, -10.4, FZ]);
+  pick('monitor', [-5, -11.6, FZ, -1.8, -10.4, FZ + 2.3]);
+
+  /* ---------- Postes de luz en paralelo ---------- */
+  for (const id of ['LH', 'LP', 'LW']) {
+    const L = LAMPS[id], [px, py] = L.post;
+    obj([px + 0.3, py, 1.8], () => {
+      box(px - .1, py - .1, FZ, px + .1, py + .1, 3.5, C.steel);
+      box(px - .06, py - .06, 3.36, L.x + .06, py + .06, 3.5, C.steel);
+      drawPendant(L, 3.36);
+    });
+    pick(id, [px - .3, py - .45, FZ, L.x + .5, py + .45, 3.5], [L.x, L.y, L.z]);
+  }
+
+  /* ---------- Línea de producción: motor, banda, prensa ---------- */
+  obj([11, -6, FZ + 0.9], drawLine);
+  SHADOWS.push([4.1, -6.7, 17.1, -5.3, FZ]);
+  pick('motor', [4.1, -7.0, FZ, 17.1, -5.0, FZ + 2.5], [8, -6, FZ + 1]);
+
+  /* ---------- Alarma de evacuación ---------- */
+  obj([0.5, 7.5, 1.8], () => {
+    box(0.4, 7.4, FZ, 0.6, 7.6, FZ + 2.6, C.steel);
+    box(0.28, 7.05, FZ + 2.15, 0.72, 7.42, FZ + 2.6, C.dark);
+    cyl([0.5, 7.05, FZ + 2.38], [0.5, 6.55, FZ + 2.38], 0.13, 0.38, [214, 70, 78], 14, [60, 30, 34]);
+    cyl([0.5, 7.5, FZ + 2.6], [0.5, 7.5, FZ + 2.7], 0.22, 0.22, C.darker, 12);
+    const fl = alarmActive ? (0.6 + 0.4 * Math.sin(T * 12)) : 0.45;
+    cyl([0.5, 7.5, FZ + 2.7], [0.5, 7.5, FZ + 3.02], 0.18, 0.1, [255, 60, 60], 12, null, alarmActive ? 1 / amb * fl * 1.2 : fl);
+  });
+  pick('alarm', [0.2, 6.5, FZ, 0.8, 7.7, FZ + 3.1]);
+
+  /* ---------- Cámara CCTV ---------- */
+  obj([16.6, -11.2, 1.8], () => {
+    box(16.5, -11.4, FZ, 16.7, -11.2, FZ + 3.05, C.steel);
+    box(16.38, -11.3, FZ + 2.9, 16.62, -11.18, FZ + 3.0, C.steel);
+    cyl([16.48, -11.12, FZ + 2.96], [15.98, -10.62, FZ + 2.78], 0.17, 0.17, C.white, 12, [30, 34, 44]);
+    cyl([16.12, -10.76, FZ + 2.85], [15.92, -10.56, FZ + 2.77], 0.21, 0.21, [205, 210, 220], 12, [20, 24, 32]);
+    if (cctvActive && Math.sin(T * 4) > 0) sphere(16.42, -11.06, FZ + 3.13, 0.05, [255, 50, 60], 1 / amb);
+  });
+  pick('cam', [15.8, -11.45, FZ + 2.4, 16.75, -10.45, FZ + 3.2], [16.2, -10.9, FZ + 2.9]);
+
+  /* ---------- Almacén: estanterías y estibas ---------- */
+  const rack = (x0, x1) => {
+    obj([(x0 + x1) / 2, 9.1, 1.4], () => {
+      const parts = [], ys = [8.6, 9.6], lv = [FZ + 0.12, FZ + 1.0, FZ + 1.9, FZ + 2.75];
+      const ups = [x0, (x0 + x1) / 2, x1];
+      for (const ux of ups) for (const uy of ys) parts.push({ k: dk(ux, uy, 1.5), f: () => box(ux - .06, uy - .06, FZ, ux + .06, uy + .06, FZ + 2.85, [60, 100, 190]) });
+      lv.forEach((z, li) => {
+        parts.push({ k: dk((x0 + x1) / 2, 9.1, z), f: () => box(x0, 8.55, z - .07, x1, 9.65, z, [240, 140, 40], [170, 176, 188]) });
+        if (li < 3) {
+          let x = x0 + 0.15, s = li * 7 + Math.round(x0);
+          while (x < x1 - 0.6) {
+            s = (s * 9301 + 49297) % 233280; const r = s / 233280;
+            const w = 0.55 + r * 0.45, h = 0.4 + r * 0.35, xx = x;
+            parts.push({ k: dk(xx + w / 2, 9.1, z + h / 2), f: () => box(xx, 8.7, z, xx + w, 9.5, z + h, C.cardboard, C.cardTop) });
+            x += w + 0.08;
+          }
+        }
+      });
+      parts.sort((a, b) => a.k - b.k).forEach(p => p.f());
+    });
+    SHADOWS.push([x0, 8.55, x1, 9.65, FZ]);
+  };
+  rack(4.2, 9.2); rack(11, 16.8);
+  const pallet = (x, y, n) => obj([x, y, FZ + 0.5], () => {
+    box(x - .6, y - .6, FZ, x + .6, y + .6, FZ + .15, C.wood);
+    const s = [[-.3, -.3], [.3, -.3], [-.3, .3], [.3, .3]];
+    for (let i = 0; i < n; i++) { const [a, b] = s[i % 4], z = FZ + .15 + Math.floor(i / 4) * .5; box(x + a - .27, y + b - .27, z, x + a + .27, y + b + .27, z + .48, C.cardboard, C.cardTop); }
+  });
+  pallet(14, 4.5, 6); pallet(15.6, 6.2, 4); pallet(6, 3, 5);
+
+  /* ---------- Punto de encuentro ---------- */
+  obj([-9.5, 10.3, 1], () => {
+    box(-9.55, 10.25, 0, -9.45, 10.35, 2.0, C.steel);
+    box(-10.2, 10.2, 1.5, -8.8, 10.4, 2.2, [40, 170, 90], [60, 190, 110]);
+  });
+
+  /* ---------- Operarios ---------- */
+  for (const w of WORKERS) obj(() => { const p = workerPos(w); return [p[0], p[1], 0.9]; }, () => drawWorker(w));
+}
+
+/* ---------- Lámpara colgante (pantalla + bombilla) ---------- */
+function bulbColor(b) {
+  // incandescente: con poca potencia el filamento brilla naranja
+  const t = clamp(Math.sqrt(b), 0, 1);
+  return [255, Math.round(lerp(120, 236, t)), Math.round(lerp(40, 170, t))];
+}
+function drawPendant(L, ztop) {
+  line3([L.x, L.y, ztop], [L.x, L.y, L.z + 0.5], rgb([40, 44, 56]), 1.5 * dpr);
+  if (L.in) {
+    const lit = L.b > 0.004;
+    if (lit) { const c = bulbColor(L.b); sphere(L.x, L.y, L.z, 0.16, c, (0.75 + 0.6 * Math.sqrt(L.b)) / amb); }
+    else sphere(L.x, L.y, L.z, 0.16, [190, 196, 210]);
+  } else {
+    cyl([L.x, L.y, L.z + 0.18], [L.x, L.y, L.z + 0.06], .07, .07, [60, 64, 76], 8);
+  }
+  cyl([L.x, L.y, L.z + 0.5], [L.x, L.y, L.z + 0.2], 0.12, 0.4, C.shade, 16, [40, 44, 56]);
+}
+
+/* ---------- Monitor del CCTV en 3D (imagen real por transformación afín) ---------- */
+function drawScreen() {
+  if (CAM[1] <= 0.02) return;
+  const y = -11.05, TL = P(-4.38, y, FZ + 2.16), TR = P(-2.42, y, FZ + 2.16), BL = P(-4.38, y, FZ + 1.1);
+  const w = feed.width, h = feed.height;
+  ctx.save();
+  ctx.setTransform((TR[0] - TL[0]) / w, (TR[1] - TL[1]) / w, (BL[0] - TL[0]) / h, (BL[1] - TL[1]) / h, TL[0], TL[1]);
+  ctx.globalAlpha = 0.6 + 0.4 * amb + (cctvActive ? 0.2 : 0);
+  ctx.drawImage(feed, 0, 0);
+  ctx.restore();
+}
+
+/* ---------- Línea de producción ---------- */
+function drawLine() {
+  const bz = FZ + 0.95;
+  for (const xl of [6.2, 8.4, 13.6, 16.6]) for (const yl of [-6.48, -5.52]) box(xl - .07, yl - .07, FZ, xl + .07, yl + .07, FZ + .76, C.dark);
+  box(6, -6.6, FZ + .75, 17, -5.4, bz, C.navy, [52, 56, 68]);
+  // franjas de la banda que se mueven
+  if (sP > 0.05) {
+    ctx.strokeStyle = rgb([92, 98, 114]); ctx.lineWidth = Math.max(1, 0.04 * S);
+    ctx.beginPath();
+    for (let k = 0; k < 22; k++) { const x = 6.05 + ((k * 0.5 + beltPos) % 11); const a = P(x, -6.55, bz + .002), b = P(x, -5.45, bz + .002); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
+    ctx.stroke();
+  }
+  box(6, -6.68, bz - .05, 17, -6.6, bz + .12, C.yellow); box(6, -5.4, bz - .05, 17, -5.32, bz + .12, C.yellow);
+  cyl([17, -6.6, FZ + .85], [17, -5.4, FZ + .85], .1, .1, C.steel, 10);
+  const parts = [];
+  // motor
+  parts.push({ k: dk(5, -6, FZ + .6), f: () => {
+    box(4.1, -6.5, FZ, 5.9, -5.5, FZ + .32, C.darker);
+    cyl([4.25, -6, FZ + .8], [5.6, -6, FZ + .8], .44, .44, C.navy, 18, [150, 160, 176]);
+    for (let i = 0; i < 4; i++) cyl([4.5 + i * 0.28, -6, FZ + .8], [4.56 + i * 0.28, -6, FZ + .8], .48, .48, [40, 70, 130], 18);
+    box(4.75, -5.7, FZ + 1.16, 5.25, -5.42, FZ + 1.45, C.dark);
+    cyl([5.6, -6, FZ + .8], [5.95, -6, FZ + .8], .08, .08, C.steel, 8);
+    cyl([5.8, -6, FZ + .8], [5.95, -6, FZ + .8], .26, .26, C.yellow, 14);
+    if (CAM[0] > 0.02) { for (let i = 0; i < 3; i++) { const a = motorA + i * TAU / 3; line3([5.96, -6, FZ + .8], [5.96, -6 + Math.cos(a) * .22, FZ + .8 + Math.sin(a) * .22], rgb([40, 40, 46]), Math.max(1.5, .05 * S)); } }
+  } });
+  // prensa
+  const px0 = PRESS_X - .6, px1 = PRESS_X + .6;
+  for (const [y0, y1] of [[-7.05, -6.8], [-5.2, -4.95]]) for (const [x0, x1] of [[px0, px0 + .22], [px1 - .22, px1]])
+    parts.push({ k: dk((x0 + x1) / 2, (y0 + y1) / 2, 1.3), f: () => box(x0, y0, FZ, x1, y1, FZ + 2.3, C.white, [200, 205, 215]) });
+  parts.push({ k: dk(PRESS_X, -6, FZ + 2.3) + 0.5, f: () => {
+    box(px0 - .05, -7.1, FZ + 2.05, px1 + .05, -4.9, FZ + 2.5, C.yellow);
+    cyl([PRESS_X, -6, FZ + 2.05], [PRESS_X, -6, pistonZ + .22], .09, .09, C.steel, 8);
+    box(PRESS_X - .32, -6.3, pistonZ, PRESS_X + .32, -5.7, pistonZ + .22, C.dark);
+    // franjas de seguridad
+    if (CAM[1] > 0) for (let i = 0; i < 6; i++) { const x = px0 + i * .22; face([[x, -4.89, FZ + 2.1], [x + .11, -4.89, FZ + 2.1], [x + .2, -4.89, FZ + 2.45], [x + .09, -4.89, FZ + 2.45]], [0, 1, 0], C.darker); }
+  } });
+  // paquetes
+  for (const p of packages) {
+    if (p.done) parts.push({ k: dk(p.x, -6, bz + .3), f: () => {
+      box(p.x - .3, -6.3, bz, p.x + .3, -5.7, bz + .52, C.cardboard, C.cardTop, 1 + p.flash * .4);
+      line3([p.x - .3, -6, bz + .53], [p.x + .3, -6, bz + .53], rgb([236, 210, 160]), Math.max(1, .06 * S));
+    } });
+    else parts.push({ k: dk(p.x, -6, bz + .2), f: () => box(p.x - .27, -6.27, bz, p.x + .27, -5.73, bz + .34, [150, 160, 176], [176, 186, 200]) });
+  }
+  parts.sort((a, b) => a.k - b.k).forEach(p => p.f());
+}
+
+/* ---------- Operario (low-poly con casco) ---------- */
+function drawWorker(w) {
+  const [x, y, ang] = workerPos(w);
+  const zb = inFactory(x, y) ? FZ : 0;
+  const bob = w.moving ? Math.abs(Math.sin(w.walk)) * 0.06 : 0;
+  const sw = w.moving ? Math.sin(w.walk) * 0.12 : 0;
+  const px = -Math.sin(ang) * 0.11, py = Math.cos(ang) * 0.11;
+  const fx = Math.cos(ang), fy = Math.sin(ang);
+  const leg = (s, o) => { const lx = x + px * s + fx * o, ly = y + py * s + fy * o; box(lx - .07, ly - .07, zb, lx + .07, ly + .07, zb + .72 + bob, [44, 60, 110]); };
+  leg(1, sw); leg(-1, -sw);
+  box(x - .2, y - .2, zb + .7 + bob, x + .2, y + .2, zb + 1.05 + bob, [44, 60, 110]);
+  box(x - .21, y - .21, zb + 1.02 + bob, x + .21, y + .21, zb + 1.36 + bob, w.col);
+  sphere(x, y, zb + 1.53 + bob, .15, C.skin);
+  // casco
+  const q = P(x, y, zb + 1.6 + bob), R = .17 * S;
+  ctx.fillStyle = rgb(C.yellow); ctx.beginPath(); ctx.arc(q[0], q[1], R, Math.PI, TAU); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(q[0], q[1], R * 1.25, R * .3, 0, 0, TAU); ctx.fill();
+}
+
+/* =========================================================
+   Cableado: aristas con corriente real (Kirchhoff en cada tramo)
+   ========================================================= */
+const EDGES = [];
+const f = FZ + 0.03;
+function sag(a, b, s = 0.45, n = 10) { const o = []; for (let i = 1; i <= n; i++) { const t = i / n; o.push([lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t) - s * 4 * t * (1 - t)]); } return o; }
+function edge(id, pts, col, cur, live, kind = 'power') {
+  const e = { id, pts, col, cur, live, kind, ph: Math.random() * 3, I: 0, cum: [0], floor: [] };
+  for (let i = 1; i < pts.length; i++) e.cum.push(e.cum[i - 1] + Math.hypot(...sub(pts[i], pts[i - 1])));
+  e.len = e.cum[e.cum.length - 1];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i];
+    if (a[2] <= f + 0.06 && b[2] <= f + 0.06) e.floor.push([a, b]);
+    else obj([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], () => drawCable(a, b, e));
+  }
+  EDGES.push(e);
+  return e;
+}
+function at(e, s) {
+  s = ((s % e.len) + e.len) % e.len;
+  let i = 1; while (i < e.cum.length - 1 && e.cum[i] < s) i++;
+  const t = (s - e.cum[i - 1]) / (e.cum[i] - e.cum[i - 1] || 1), a = e.pts[i - 1], b = e.pts[i];
+  return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+}
+const bi = c => c.I + (st.fault === c.id ? E.If : 0);
+function buildEdges() {
+  const live = () => E.Vbus > 1;
+  const br = id => () => E.Vbus > 1 && CI[id].on;
+  const G0 = [-19, -0.8, 3.95], PA = [-14.5, 1.8, 5.3], PB = [-10, 3.3, 5.3], MT = [-6.9, 6.3, 3.7];
+  edge('feed', [G0, ...sag(G0, PA, .3), ...sag(PA, PB, .5), ...sag(PB, MT, .45), [-6.9, 6.3, 3.15], [-5.65, 6.3, 3.15], [-5.65, 6.3, FZ + 2.0]], '#3fc1ff', () => E.Itot, () => E.Vopen > 1);
+  const N0 = [-5.3, 6.3, f], N1 = [-2, 6.3, f], N2 = [-2, 3, f], N3 = [-2, -1.4, f], N4 = [0, -1.4, f], N5 = [5, -1.4, f], N6 = [14, -1.4, f];
+  edge('t0', [N0, N1], '#3fc1ff', () => E.Itot, live);
+  edge('t1', [N1, N2], '#3fc1ff', () => E.Itot - bi(CI.C6), live);
+  edge('t2', [N2, N3, N4], '#3fc1ff', () => E.Itot - bi(CI.C6) - bi(CI.C2), live);
+  edge('t3', [N4, N5], '#3fc1ff', () => E.Itot - bi(CI.C6) - bi(CI.C2) - bi(CI.C1), live);
+  edge('t4', [N5, N6], '#3fc1ff', () => bi(CI.C3) + bi(CI.C7), live);
+  // C6 alarma
+  edge('C6', [N1, [0.5, 6.3, f], [0.5, 7.3, f], [0.5, 7.3, FZ + 2.3]], CI.C6.col, () => CI.C6.I, br('C6'));
+  // C2 luz pasillo
+  edge('C2', [N2, [-1, 3, f], [-1.12, 3, f], [-1.12, 3, 3.3], [-0.3, 3, 3.3], [-0.3, 3, 2.98]], CI.C2.col, () => CI.C2.I, br('C2'));
+  // C1 lazo en serie: un solo camino que pasa por S1 → S2 → S3 y regresa
+  const B = 3.3, lp = [];
+  lp.push(N4, [0, -4.2, f], [2.15, -4.2, f], [2.15, -7.5, f], [2.15, -7.5, B], [2.15, -7.28, B]);
+  for (const id of ['S1', 'S2', 'S3']) { const L = LAMPS[id]; lp.push([L.x + .14, -7.28, B], [L.x + .05, -7.5, L.z + .05], [L.x - .05, -7.5, L.z + .05], [L.x - .14, -7.28, B]); }
+  lp.push([-5.15, -7.28, B], [-5.15, -7.5, B], [-5.15, -7.5, f], [-5.15, -4.5, f], [-0.35, -4.5, f], [-0.35, -1.6, f]);
+  edge('C1', lp, CI.C1.col, () => CI.C1.I, br('C1'));
+  // C5 motor
+  edge('C5', [N5, [5, -5.42, f], [5, -5.42, FZ + 1.3]], CI.C5.col, () => CI.C5.I, br('C5'));
+  // C4 luz almacén
+  edge('C4', [N5, [5.2, -1.2, f], [5.2, 5, f], [8.88, 5, f], [8.88, 5, 3.3], [9.7, 5, 3.3], [9.7, 5, 2.98]], CI.C4.col, () => CI.C4.I, br('C4'));
+  // C3 luz producción
+  edge('C3', [N6, [14, -9.5, f], [13.12, -9.5, f], [13.12, -9.5, 3.3], [13.7, -9.5, 3.3], [13.7, -9.5, 2.98]], CI.C3.col, () => CI.C3.I, br('C3'));
+  // C7 CCTV
+  edge('C7', [N6, [16.4, -1.4, f], [16.4, -11.1, f], [16.4, -11.1, FZ + 2.8]], CI.C7.col, () => CI.C7.I, br('C7'));
+  // cable de video (señal) cámara → monitor
+  edge('video', [[16.62, -11.32, FZ + 2.7], [16.62, -11.6, f], [-2.6, -11.6, f], [-3.1, -11.6, f], [-3.1, -11.3, f], [-3.1, -11.3, FZ + 1.2]], '#b98cff', () => cctvActive ? 1 : 0, () => cctvActive, 'video');
+}
+function cableStyle(e) {
+  const on = e.live();
+  return { on, core: on ? e.col : '#4a5274', w: e.kind === 'video' ? .06 : .09 };
+}
+function drawCable(a, b, e) {
+  const s = cableStyle(e);
+  line3(a, b, 'rgba(10,14,28,.85)', (s.w + .06) * S);
+  line3(a, b, s.core, s.w * S);
+}
+function drawFloorCables() {
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const e of EDGES) {
+    if (!e.floor.length) continue;
+    const s = cableStyle(e);
+    for (const pass of [0, 1]) {
+      ctx.beginPath();
+      for (const [a, b] of e.floor) { const p = P(a[0], a[1], a[2]), q = P(b[0], b[1], b[2]); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); }
+      if (pass === 0) { ctx.strokeStyle = 'rgba(10,14,28,.7)'; ctx.lineWidth = (s.w + .08) * S; }
+      else { ctx.strokeStyle = s.core; ctx.globalAlpha = s.on ? 0.95 : 0.8; ctx.lineWidth = s.w * S; if (e.kind === 'video') ctx.setLineDash([.25 * S, .15 * S]); }
+      ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+    }
+  }
+}
+function drawXray() {
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const e of EDGES) {
+    const s = cableStyle(e);
+    ctx.beginPath();
+    e.pts.forEach((p, i) => { const q = P(p[0], p[1], p[2]); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); });
+    ctx.strokeStyle = s.on ? e.col : '#3a4266'; ctx.globalAlpha = .35; ctx.lineWidth = .3 * S; ctx.stroke();
+    ctx.globalAlpha = .9; ctx.lineWidth = .07 * S; ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawParticles() {
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const e of EDGES) {
+    const I = e.I;
+    if (I <= 0.002 || !e.live()) continue;
+    if (e.kind === 'video') {
+      for (let s = (T * 5) % 1.4; s < e.len; s += 1.4) {
+        const p = at(e, s), q = P(p[0], p[1], p[2]), r = .12 * S;
+        ctx.fillStyle = 'rgba(200,160,255,.95)'; ctx.fillRect(q[0] - r, q[1] - r * .5, r * 2, r);
+      }
+      continue;
+    }
+    const sp = 0.8, n = Math.floor(e.len / sp);
+    const r = (0.07 + 0.06 * Math.min(1, I / 5)) * S;
+    const ac = st.pmode === 'ac';
+    for (let i = 0; i < n; i++) {
+      const s = ac ? i * sp + (0.12 + 0.2 * Math.min(1, I / 3)) * Math.sin(TAU * 1.2 * T) : i * sp + e.ph;
+      const p = at(e, s), q = P(p[0], p[1], p[2]);
+      const g = ctx.createRadialGradient(q[0], q[1], 0, q[0], q[1], r * 3);
+      g.addColorStop(0, ac ? 'rgba(160,220,255,.95)' : 'rgba(160,230,255,.95)');
+      g.addColorStop(.35, 'rgba(63,193,255,.55)'); g.addColorStop(1, 'rgba(63,193,255,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q[0], q[1], r * 3, 0, TAU); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+/* =========================================================
+   Pase del piso: isla, río, losa, zonas, sombras, luz, sonido
+   ========================================================= */
+function drawFloorPass() {
+  // Isla base
+  box(-33, -18, -1.4, 23, 16, 0, C.groundSide, C.ground);
+  // rejilla (skill)
+  ctx.strokeStyle = 'rgba(120,160,255,.09)'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = -32; x <= 22; x += 2) { const a = P(x, -18, 0), b = P(x, 16, 0); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
+  for (let y = -18; y <= 16; y += 2) { const a = P(-33, y, 0), b = P(23, y, 0); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
+  ctx.stroke();
+  // Camino de acceso
+  face([[-9, 2.3, .005], [-6.3, 2.3, .005], [-6.3, 4.7, .005], [-9, 4.7, .005]], [0, 0, 1], [120, 116, 104]);
+  // Río
+  face([[-20.8, -18, .01], [-17.2, -18, .01], [-17.2, -3.4, .01], [-20.8, -3.4, .01]], [0, 0, 1], [40, 110, 190]);
+  ctx.strokeStyle = rgb([150, 210, 255], 1, .5); ctx.lineWidth = Math.max(1, .05 * S);
+  ctx.beginPath();
+  for (let k = 0; k < 14; k++) {
+    const y = -3.6 - ((k * 1.05 + flowPos) % 14.4);
+    const a = P(-20.4 + (k % 3) * .4, y, .02), b = P(-18.2 + (k % 2) * .5, y - .2, .02);
+    if (st.Q > 0) { ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
+  }
+  ctx.stroke();
+  // Punto de encuentro
+  floorTf(-9.5, 8.6, .01);
+  ctx.strokeStyle = rgb([60, 200, 110]); ctx.lineWidth = .22; ctx.beginPath(); ctx.arc(0, 0, 2.1, 0, TAU); ctx.stroke();
+  ctx.fillStyle = rgb([60, 200, 110], 1, .18); ctx.fill();
+  resetTf();
+  // Losa de la fábrica y zonas
+  box(-6.3, -12.3, 0, 18.3, 10.3, FZ, C.slab, C.fHall);
+  const zone = (x0, y0, x1, y1, c) => face([[x0, y0, FZ + .002], [x1, y0, FZ + .002], [x1, y1, FZ + .002], [x0, y1, FZ + .002]], [0, 0, 1], c);
+  zone(-6, -12, 2.85, -3.15, C.fCtrl); zone(3.15, -12, 18, .85, C.fProd); zone(3.15, 1.15, 18, 10, C.fWare);
+  // Líneas de seguridad amarillas
+  ctx.strokeStyle = rgb(C.yellow, 1, .9); ctx.lineWidth = Math.max(1, .1 * S); ctx.setLineDash([.5 * S, .3 * S]);
+  path3([[3.8, -7.6, FZ + .004], [17.6, -7.6, FZ + .004], [17.6, -4.2, FZ + .004], [3.8, -4.2, FZ + .004]]); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = rgb([235, 238, 245], 1, .5); ctx.lineWidth = Math.max(1, .07 * S);
+  path3([[-5.6, -2.3, FZ + .004], [2.3, -2.3, FZ + .004], [2.3, 9.4, FZ + .004], [-5.6, 9.4, FZ + .004]]); ctx.stroke();
+  // Texto en el piso
+  if (st.labels) {
+    const tc = 'rgba(235,240,255,.28)';
+    floorText('SALA DE CONTROL', -1.6, -5, FZ + .01, .9, tc);
+    floorText('PRODUCCIÓN', 10.5, -2.6, FZ + .01, 1.15, tc);
+    floorText('ALMACÉN', 10.5, 3, FZ + .01, 1.15, tc);
+    floorText('ENTRADA', -3.6, 0.2, FZ + .01, .9, tc);
+    floorText('RÍO', -19, -12, .02, 1, 'rgba(220,240,255,.45)');
+  }
+  // Sombras suaves
+  ctx.fillStyle = `rgba(0,0,0,${.22 * amb + .08})`;
+  for (const [x0, y0, x1, y1, z] of SHADOWS) { path3([[x0 - .35, y0 - .5, z + .003], [x1 - .35, y0 - .5, z + .003], [x1, y1, z + .003], [x0, y1, z + .003]]); ctx.fill(); }
+  // Cables del piso
+  drawFloorCables();
+  // Falla: quemadura en el piso
+  if (st.fault) {
+    const p = faultPt(st.fault); floorTf(p[0], p[1], p[2]);
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.arc(0, 0, .45, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#ff5a6a'; ctx.lineWidth = .1; ctx.beginPath(); ctx.moveTo(-.3, -.3); ctx.lineTo(.3, .3); ctx.moveTo(.3, -.3); ctx.lineTo(-.3, .3); ctx.stroke();
+    resetTf();
+  }
+  // Charcos de luz de las lámparas
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const k in LAMPS) {
+    const L = LAMPS[k]; if (L.b < 0.004) continue;
+    const b = Math.sqrt(L.b), c = bulbColor(L.b), R = 1 + 3.2 * b;
+    floorTf(L.x, L.y, FZ + .005);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+    const a = (st.night ? .55 : .28) * b;
+    g.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},${a})`); g.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+    resetTf();
+  }
+  // Alarma: barrido de la baliza y ondas de sonido sobre el piso
+  if (alarmActive) {
+    floorTf(0.5, 7.5, FZ + .006);
+    const a0 = T * 4;
+    for (const off of [0, Math.PI]) {
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 7);
+      g.addColorStop(0, `rgba(255,40,50,${st.night ? .5 : .28})`); g.addColorStop(1, 'rgba(255,40,50,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 7, a0 + off - .3, a0 + off + .3); ctx.closePath(); ctx.fill();
+    }
+    for (let i = 0; i < 4; i++) {
+      const fr = (T * 0.8 + i / 4) % 1;
+      ctx.strokeStyle = `rgba(255,120,130,${(1 - fr) * .6})`; ctx.lineWidth = .08;
+      ctx.beginPath(); ctx.arc(0, -0.6, fr * 8, 0, TAU); ctx.stroke();
+    }
+    resetTf();
+  }
+  ctx.restore();
+}
+
+/* =========================================================
+   Capas superiores: agua, brillos, calor, sonido, chispas
+   ========================================================= */
+function drawWater() {
+  if (st.Q <= 0) return;
+  const k = st.Q / 40;
+  // lámina de agua desde el canal hasta las paletas
+  ctx.save();
+  ctx.fillStyle = `rgba(110,190,255,${.25 + .35 * k})`;
+  const pts = [];
+  for (let i = 0; i <= 8; i++) { const t = i / 8 * .38; pts.push([-19.65 + .5 * t, 4.9 - 4.8 * t * t]); }
+  ctx.beginPath();
+  pts.forEach(([x, z], i) => { const q = P(x, -5.38, z); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); });
+  for (let i = pts.length - 1; i >= 0; i--) { const q = P(pts[i][0], -4.62, pts[i][1]); ctx.lineTo(q[0], q[1]); }
+  ctx.closePath(); ctx.fill();
+  // gotas cayendo
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = 'rgba(170,220,255,.85)'; ctx.lineWidth = Math.max(1, .05 * S); ctx.lineCap = 'round';
+  const n = Math.round(drops.length * k);
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const d = drops[i], t = d.u, t2 = Math.max(0, t - .05);
+    const a = P(-19.65 + .5 * t, d.y, 4.9 - 4.8 * t * t), b = P(-19.65 + .5 * t2, d.y, 4.9 - 4.8 * t2 * t2);
+    ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+  }
+  ctx.stroke();
+  // espuma abajo
+  ctx.fillStyle = 'rgba(230,245,255,.7)';
+  for (let i = 0; i < 10 * k + 2; i++) { const q = P(-19.3 + Math.sin(T * 7 + i) * .5, -5 + Math.cos(T * 5 + i * 2) * .5, .1 + Math.abs(Math.sin(T * 9 + i)) * .3); ctx.beginPath(); ctx.arc(q[0], q[1], .06 * S, 0, TAU); ctx.fill(); }
+  ctx.restore();
+}
+function drawGlows() {
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const k in LAMPS) {
+    const L = LAMPS[k]; if (L.b < 0.004 || !L.in) continue;
+    const b = Math.pow(L.b, 0.4), c = bulbColor(L.b), q = P(L.x, L.y, L.z), R = (0.8 + 1.9 * b) * S;
+    const g = ctx.createRadialGradient(q[0], q[1], 0, q[0], q[1], R);
+    g.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},${.9 * b})`); g.addColorStop(.3, `rgba(${c[0]},${c[1]},${c[2]},${.3 * b})`); g.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q[0], q[1], R, 0, TAU); ctx.fill();
+  }
+  if (alarmActive) {
+    const q = P(0.5, 7.5, FZ + 2.86), fl = .6 + .4 * Math.sin(T * 12), R = 2.4 * S;
+    const g = ctx.createRadialGradient(q[0], q[1], 0, q[0], q[1], R);
+    g.addColorStop(0, `rgba(255,60,60,${.9 * fl})`); g.addColorStop(1, 'rgba(255,0,0,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q[0], q[1], R, 0, TAU); ctx.fill();
+    // ondas de sonido saliendo de la bocina
+    const a = P(0.5, 7.05, FZ + 2.38), b = P(0.5, 6.55, FZ + 2.38), dir = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    for (let i = 0; i < 4; i++) {
+      const fr = (T * 1.4 + i / 4) % 1;
+      ctx.strokeStyle = `rgba(200,150,255,${(1 - fr) * .9})`; ctx.lineWidth = Math.max(1.5, .07 * S);
+      ctx.beginPath(); ctx.arc(b[0], b[1], (.3 + fr * 2.6) * S, dir - .7, dir + .7); ctx.stroke();
+    }
+  }
+  if (cctvActive) { // cono de visión de la cámara
+    const ap = [15.95, -10.6, FZ + 2.77], cs = [[8.5, -8.2], [17.2, -8.2], [17.2, -3.9], [8.5, -3.9]];
+    ctx.fillStyle = 'rgba(185,140,255,.05)'; ctx.strokeStyle = 'rgba(185,140,255,.25)'; ctx.lineWidth = 1;
+    for (let i = 0; i < 4; i++) { const a = cs[i], b = cs[(i + 1) % 4]; path3([ap, [a[0], a[1], FZ + .01], [b[0], b[1], FZ + .01]]); ctx.fill(); ctx.stroke(); }
+  }
+  // generador produciendo
+  if (E.Vopen > 1) {
+    const q = P(-19, -1, 2.4), k = clamp(E.Ptot / Math.max(1, E.Pav), 0.15, 1), R = 2.4 * S;
+    const g = ctx.createRadialGradient(q[0], q[1], 0, q[0], q[1], R);
+    g.addColorStop(0, `rgba(255,225,77,${.12 + .14 * k})`); g.addColorStop(1, 'rgba(255,225,77,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q[0], q[1], R, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawHeat() {
+  if (!st.heat) return;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const h of heatP) {
+    const q = P(h.x, h.y, h.z), a = Math.sin(h.t / 1.6 * Math.PI) * .32 * h.s, r = (.1 + h.t * .14) * S;
+    const g = ctx.createRadialGradient(q[0], q[1], 0, q[0], q[1], r);
+    g.addColorStop(0, `rgba(255,120,60,${a})`); g.addColorStop(1, 'rgba(255,80,40,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q[0], q[1], r, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawSparks() {
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+  for (const s of sparks) {
+    const a = P(s.x, s.y, s.z), b = P(s.x - s.vx * .03, s.y - s.vy * .03, s.z - s.vz * .03);
+    ctx.strokeStyle = `rgba(255,${200 + Math.random() * 55 | 0},120,${1 - s.t / s.life})`; ctx.lineWidth = Math.max(1.5, .05 * S);
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  }
+  ctx.restore();
+  for (const fl of floaters) {
+    const q = P(fl.x, fl.y, fl.z);
+    ctx.font = `700 ${13 * dpr}px system-ui`; ctx.textAlign = 'center';
+    ctx.fillStyle = `rgba(255,225,77,${1 - fl.t / 1.4})`; ctx.fillText(fl.txt, q[0], q[1]);
+  }
+}
+
+/* =========================================================
+   Etiquetas flotantes (se ocultan con 🏷)
+   ========================================================= */
+const TAGS = [
+  { id: 'res', at: [-27.5, -8, 5.2], t: () => '💧 Embalse · energía potencial', col: '#3fc1ff' },
+  { id: 'gate', at: [-21, -5, 7.1], t: () => `Compuerta · ${st.Q} L/s`, col: '#3fc1ff' },
+  { id: 'wheel', at: [-17.3, -5, 3.6], t: () => '🌀 Turbina · movimiento', col: '#3fc1ff' },
+  { id: 'gen', at: [-19, -0.8, 4.1], t: () => `⚡ Generador · ${fmtV(E.Vopen)}`, col: '#ffe14d' },
+  { id: 'line', at: [-12.2, 2.6, 5.4], t: () => `Línea eléctrica · ${fmtA(E.Itot)}`, col: '#3fc1ff' },
+  { id: 'cabinet', at: [-5.65, 6.3, FZ + 2.3], t: () => `🔲 Breakers · ${st.brkOn ? 'cerrado' : st.tripped ? '¡disparado!' : 'abierto'}`, col: () => st.brkOn ? '#3ee08f' : '#ff5a6a', up: 48 },
+  { id: 'S2', at: [-1.5, -7.5, 3.55], t: () => `🔗 Serie · S1 S2 S3 · ${fmtW(LAMPS.S1.P)} c/u`, col: '#ffe14d' },
+  { id: 'LH', at: [-0.3, 3, 2.65], t: () => `💡 Pasillo · ${fmtW(LAMPS.LH.P)}`, col: '#3ee08f' },
+  { id: 'LP', at: [13.7, -9.5, 2.65], t: () => `💡 Producción · ${fmtW(LAMPS.LP.P)}`, col: '#3ee08f' },
+  { id: 'LW', at: [9.7, 5, 2.65], t: () => `💡 Almacén · ${fmtW(LAMPS.LW.P)}`, col: '#3ee08f' },
+  { id: 'motor', at: [5, -6, FZ + 1.5], t: () => `⚙️ Motor · ${Math.round(motorSpd * 100)} %`, col: '#ffb13b' },
+  { id: 'press', at: [11, -6, FZ + 2.55], t: () => `Prensa · ${produced} paquetes`, col: '#ffb13b' },
+  { id: 'alarm', at: [0.5, 7.5, FZ + 3.05], t: () => `🔔 Alarma · ${alarmActive ? 'SONANDO' : 'apagada'}`, col: '#ff5a6a' },
+  { id: 'cam', at: [16.2, -10.9, FZ + 3.2], t: () => '📹 Cámara', col: '#b98cff', up: 50 },
+  { id: 'monitor', at: [-3.4, -11.1, FZ + 2.3], t: () => '📺 Monitor', col: '#b98cff' },
+  { id: 'meet', at: [-9.5, 10.3, 2.3], t: () => 'Punto de encuentro', col: '#3ee08f' }
+];
+const SHORT = { res: '💧 Embalse', gate: 'Compuerta', wheel: '🌀 Turbina', gen: '⚡ Generador', line: 'Línea', cabinet: '🔲 Breakers', S2: '🔗 Serie', LH: '💡 Pasillo', LP: '💡 Producción', LW: '💡 Almacén', motor: '⚙️ Motor', press: 'Prensa', alarm: '🔔 Alarma', cam: '📹 Cámara', monitor: '📺 Monitor', meet: 'Encuentro' };
+function drawLabels() {
+  if (!st.labels) return;
+  ctx.save();
+  const compact = W / dpr < 640;
+  ctx.font = `600 ${(compact ? 10 : 11.5) * dpr}px system-ui,-apple-system,Segoe UI,Roboto,sans-serif`;
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  const lift = (compact ? 16 : 22) * dpr;
+  for (const tg of TAGS) {
+    const q = P(tg.at[0], tg.at[1], tg.at[2]);
+    if (q[0] < -50 || q[0] > W + 50 || q[1] < -50 || q[1] > H + 50) continue;
+    const txt = compact ? (SHORT[tg.id] || tg.t()) : tg.t(), col = typeof tg.col === 'function' ? tg.col() : tg.col;
+    const w = ctx.measureText(txt).width + (compact ? 10 : 16) * dpr, h = (compact ? 16 : 20) * dpr, x = q[0], y = q[1] - (tg.up ? tg.up * (compact ? .7 : 1) * dpr : lift);
+    ctx.strokeStyle = col; ctx.globalAlpha = .7; ctx.lineWidth = dpr;
+    ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(x, y + h / 2); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(q[0], q[1], 2.5 * dpr, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(14,20,46,.9)'; rr(x - w / 2, y - h / 2, w, h, 7 * dpr); ctx.fill();
+    ctx.strokeStyle = col; ctx.stroke();
+    ctx.fillStyle = '#e9edff'; ctx.fillText(txt, x, y + .5);
+  }
+  ctx.restore();
+}
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+/* Anillos: hover, selección, recorrido */
+function ring(cx, cy, z, r, col, lw, dash) {
+  floorTf(cx, cy, z);
+  ctx.strokeStyle = col; ctx.lineWidth = lw; if (dash) ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+  resetTf();
+}
+function pickOf(id) { return PICKS.find(p => p.id === id); }
+function drawRings() {
+  const fz = p => p.b[2] <= FZ + .01 ? p.b[2] + .02 : (p.b[2] < .2 ? .03 : p.b[2]);
+  if (st.hover && st.hover !== st.sel) { const p = pickOf(st.hover); if (p) ring(p.ctr[0], p.ctr[1], fz(p), Math.max(p.b[3] - p.b[0], p.b[4] - p.b[1]) * .5 + .4, 'rgba(63,193,255,.8)', .08); }
+  if (st.sel) { const p = pickOf(st.sel); if (p) ring(p.ctr[0], p.ctr[1], fz(p), Math.max(p.b[3] - p.b[0], p.b[4] - p.b[1]) * .5 + .5, 'rgba(255,225,77,.95)', .1, [.4, .25]); }
+  if (tour.on) {
+    const s = TOUR[tour.i]; if (s.hl) {
+      const pulse = .5 + .5 * Math.sin(T * 4);
+      ring(s.hl[0], s.hl[1], s.hl[2], s.hl[3] + pulse * .5, `rgba(185,140,255,${.5 + .5 * pulse})`, .14);
+      ring(s.hl[0], s.hl[1], s.hl[2], s.hl[3] + 1 + pulse, `rgba(185,140,255,${.25 * (1 - pulse)})`, .3);
+    }
+  }
+}
+
+/* =========================================================
+   Imagen del CCTV (cámara → cable de video → monitor)
+   ========================================================= */
+const feed = document.createElement('canvas'); feed.width = 320; feed.height = 200;
+const fx = feed.getContext('2d');
+const mon = $('mon'), mctx = mon.getContext('2d');
+function drawFeed() {
+  const w = 320, h = 200, g = fx;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  if (!cctvActive) {
+    g.fillStyle = '#04060b'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#39405a'; g.font = '600 13px system-ui'; g.textAlign = 'center';
+    g.fillText(CI.C7.on ? (st.brkOn ? 'SIN SEÑAL · VOLTAJE BAJO' : 'SIN ENERGÍA') : 'CÁMARA APAGADA', w / 2, h / 2);
+    return;
+  }
+  const ir = LAMPS.LP.b < 0.15 && st.night;
+  const pal = ir ? { bg: '#13261a', fl: '#1d3a26', belt: '#0d1a11', rail: '#5fbf74', box: '#8be09d', raw: '#4e8a5c', ink: '#9df0b0' }
+                 : { bg: '#2c3344', fl: '#394155', belt: '#1c2230', rail: '#e6b830', box: '#c99a62', raw: '#8b96aa', ink: '#e9edff' };
+  g.fillStyle = pal.bg; g.fillRect(0, 0, w, h);
+  g.strokeStyle = pal.fl; g.lineWidth = 1;
+  for (let x = 0; x < w; x += 20) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x - 30, h); g.stroke(); }
+  const X = x => 14 + (x - 6) / 11 * 292, Y = y => 60 + (y + 8) / 4 * 110;
+  g.fillStyle = pal.belt; g.fillRect(X(6), Y(-6.6), X(17) - X(6), Y(-5.4) - Y(-6.6));
+  g.strokeStyle = pal.rail; g.lineWidth = 3; g.strokeRect(X(6), Y(-6.6), X(17) - X(6), Y(-5.4) - Y(-6.6));
+  g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 1;
+  for (let k = 0; k < 22; k++) { const x = X(6.05 + ((k * .5 + beltPos) % 11)); g.beginPath(); g.moveTo(x, Y(-6.55)); g.lineTo(x, Y(-5.45)); g.stroke(); }
+  for (const p of packages) { g.fillStyle = p.done ? pal.box : pal.raw; const s = p.done ? 15 : 12; g.fillRect(X(p.x) - s / 2, Y(-6) - s / 2, s, s); }
+  g.fillStyle = ir ? '#3f7a4c' : '#e6b830'; g.fillRect(X(10.4), Y(-7.1), X(11.6) - X(10.4), 10); g.fillRect(X(10.4), Y(-5.1) - 10, X(11.6) - X(10.4), 10);
+  for (const wk of WORKERS.slice(0, 2)) {
+    const [x, y] = workerPos(wk); if (x < 6 || y < -8 || y > -3.9) continue;
+    g.fillStyle = ir ? '#9df0b0' : '#f0962a'; g.beginPath(); g.arc(X(x), Y(y), 7, 0, TAU); g.fill();
+    g.fillStyle = ir ? '#d8ffe0' : '#ffd23a'; g.beginPath(); g.arc(X(x), Y(y) - 2, 4, 0, TAU); g.fill();
+  }
+  // HUD
+  g.fillStyle = pal.ink; g.font = '700 11px ui-monospace,Consolas,monospace'; g.textAlign = 'left';
+  g.fillText('CAM 01 · PRODUCCIÓN', 10, 18);
+  const d = new Date(); g.textAlign = 'right';
+  g.fillText(d.toLocaleTimeString('es-CO', { hour12: false }), w - 10, h - 10);
+  g.textAlign = 'left'; g.fillText('📦 ' + produced, 10, h - 10);
+  if (Math.sin(T * 4) > 0) { g.fillStyle = '#ff3040'; g.beginPath(); g.arc(w - 46, 14, 5, 0, TAU); g.fill(); g.fillStyle = pal.ink; g.fillText('REC', w - 38, 18); }
+  if (ir) { g.fillStyle = '#9df0b0'; g.fillText('IR · VISIÓN NOCTURNA', 10, 34); }
+  if (alarmActive && Math.sin(T * 8) > 0) { g.fillStyle = 'rgba(255,40,60,.85)'; g.fillRect(0, h / 2 - 14, w, 28); g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = '800 15px system-ui'; g.fillText('⚠ EVACUACIÓN', w / 2, h / 2 + 5); }
+  g.fillStyle = 'rgba(0,0,0,.18)'; for (let y = 0; y < h; y += 3) g.fillRect(0, y, w, 1);
+  const vg = g.createRadialGradient(w / 2, h / 2, 60, w / 2, h / 2, 200); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.55)'); g.fillStyle = vg; g.fillRect(0, 0, w, h);
+  if (E.sag) { g.globalAlpha = .25 + .25 * Math.random(); g.fillStyle = '#000'; g.fillRect(0, 0, w, h); g.globalAlpha = 1; }
+}
+
+/* =========================================================
+   Render principal
+   ========================================================= */
+function render() {
+  setCam();
+  resetTf();
+  ctx.clearRect(0, 0, W, H);
+  drawFloorPass();
+  for (const o of OBJ) { const c = typeof o.c === 'function' ? o.c() : o.c; o.k = (c[0] * sT + c[1] * cT) * cP + c[2] * sP * 0.25; }
+  OBJ.sort((a, b) => a.k - b.k);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const o of OBJ) o.draw();
+  ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+  if (st.night) { ctx.fillStyle = 'rgba(5,8,25,.0)'; }
+  drawWater();
+  if (st.xray) drawXray();
+  drawHeat();
+  drawGlows();
+  if (st.particles) drawParticles();
+  drawSparks();
+  drawRings();
+  drawLabels();
+}
+
+/* =========================================================
+   Interacción con el escenario
+   ========================================================= */
+function pickAt(mx, my) {
+  let best = null, bk = -1e9;
+  for (const p of PICKS) {
+    const b = p.b; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const x of [b[0], b[3]]) for (const y of [b[1], b[4]]) for (const z of [b[2], b[5]]) { const q = P(x, y, z); x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); }
+    if (mx >= x0 && mx <= x1 && my >= y0 && my <= y1) {
+      const area = (x1 - x0) * (y1 - y0);
+      const k = dk(p.ctr[0], p.ctr[1], p.ctr[2]) - area / (S * S) * 0.002;
+      if (k > bk) { bk = k; best = p.id; }
+    }
+  }
+  return best;
+}
+const LAMP_IDS = Object.keys(LAMPS);
+function circuitOf(id) {
+  if (LAMPS[id]) return LAMPS[id].c;
+  return { motor: 'C5', alarm: 'C6', cam: 'C7', monitor: 'C7' }[id] || null;
+}
+function clickOn(id) {
+  if (!id) { if (st.tool === 'inspect') { st.sel = null; syncUI(true); } return; }
+  const c = circuitOf(id);
+  if (st.tool === 'inspect') { st.sel = id; sClick(); syncUI(true); return; }
+  if (st.tool === 'bulb') {
+    if (LAMPS[id]) { LAMPS[id].in = !LAMPS[id].in; sPlace(); st.sel = id;
+      if (!LAMPS[id].in && LAMPS[id].c === 'C1') toast('Quitaste ' + id + ': el único camino de la corriente quedó abierto. ¡Por eso se apagan las tres bombillas en serie!', 'info');
+      else if (!LAMPS[id].in) toast('Quitaste la bombilla. Las demás luces siguen encendidas porque cada una tiene su propio camino (paralelo).', 'info');
+    } else toast('La herramienta 💡 sirve para quitar o poner bombillas. Toca una lámpara.', 'info');
+    syncUI(true); return;
+  }
+  if (st.tool === 'fault') {
+    if (c) { st.fault = st.fault === c ? null : c; if (st.fault) { sBuzz(); toast('⚡ Cortocircuito en ' + CI[c].name + ': el cable dañado une los dos conductores. Observa el breaker…'); } else toast('Cable reparado. Sube el breaker para devolver la energía.', 'info'); }
+    else toast('Toca un equipo de la fábrica para dañar su cable.', 'info');
+    syncUI(true); return;
+  }
+  // herramienta interruptor
+  st.sel = id;
+  if (c) { CI[c].on = !CI[c].on; sToggle(); }
+  else if (id === 'cabinet') toggleBreaker();
+  else if (id === 'gen') toggleGen();
+  else if (id === 'gate' || id === 'wheel' || id === 'res') { if (st.Q > 0) { st.lastQ = st.Q; setQ(0); } else setQ(st.lastQ || 25); sToggle(); }
+  syncUI(true);
+}
+const ptrs = new Map();
+let drag = null, pinch = null;
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('pointerdown', e => {
+  ensureAudio();
+  cv.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (ptrs.size === 1) drag = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, pan: e.button === 2 || e.shiftKey };
+  else if (ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()];
+    pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), z: cam.zoom, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+    if (drag) drag.moved = true;
+  }
+  cv.style.cursor = 'grabbing';
+});
+cv.addEventListener('pointermove', e => {
+  const r = cv.getBoundingClientRect(), mx = (e.clientX - r.left) * dpr, my = (e.clientY - r.top) * dpr;
+  if (!ptrs.has(e.pointerId)) {
+    const h = pickAt(mx, my);
+    if (h !== st.hover) { st.hover = h; }
+    cv.style.cursor = h ? 'pointer' : 'grab';
+    showTip(h, e.clientX - r.left, e.clientY - r.top);
+    return;
+  }
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (ptrs.size === 2 && pinch) {
+    const [a, b] = [...ptrs.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    cam.zoom = camT.zoom = clamp(pinch.z * d / pinch.d, 0.5, 4);
+    const mx2 = (a.x + b.x) / 2, my2 = (a.y + b.y) / 2;
+    panBy(mx2 - pinch.mx, my2 - pinch.my); pinch.mx = mx2; pinch.my = my2;
+    return;
+  }
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 5) drag.moved = true;
+  drag.x = e.clientX; drag.y = e.clientY;
+  if (!drag.moved) return;
+  hideTip();
+  if (drag.pan) panBy(dx, dy);
+  else {
+    cam.th = camT.th = cam.th + dx * 0.006;
+    cam.ph = camT.ph = clamp(cam.ph + dy * 0.005, 0.28, Math.PI / 2);
+    markView();
+  }
+});
+function endPtr(e) {
+  if (drag && !drag.moved && ptrs.size === 1) {
+    const r = cv.getBoundingClientRect();
+    clickOn(pickAt((e.clientX - r.left) * dpr, (e.clientY - r.top) * dpr));
+  }
+  ptrs.delete(e.pointerId);
+  if (ptrs.size < 2) pinch = null;
+  if (ptrs.size === 0) drag = null;
+  cv.style.cursor = 'grab';
+}
+cv.addEventListener('pointerup', endPtr);
+cv.addEventListener('pointercancel', e => { ptrs.delete(e.pointerId); drag = null; pinch = null; });
+cv.addEventListener('pointerleave', () => { if (!ptrs.size) { st.hover = null; hideTip(); } });
+cv.addEventListener('wheel', e => { e.preventDefault(); camT.zoom = clamp(camT.zoom * Math.exp(-e.deltaY * 0.0012), 0.5, 4); }, { passive: false });
+function panBy(dx, dy) {
+  const dsx = dx * dpr / S, dd = dy * dpr / (S * Math.max(0.25, sP));
+  const wx = cT * dsx + sT * dd, wy = -sT * dsx + cT * dd;
+  cam.cx = camT.cx = cam.cx - wx; cam.cy = camT.cy = cam.cy - wy;
+}
+
+/* Tooltip (se oculta junto con las etiquetas) */
+const tip = $('tip');
+function hideTip() { tip.style.display = 'none'; }
+function showTip(id, x, y) {
+  if (!id || !st.labels || drag) { hideTip(); return; }
+  const inf = info(id);
+  tip.innerHTML = `<b>${inf.title}</b><br>${inf.lines.map(([k, v]) => `${k}: <span class="k">${v}</span>`).join('<br>')}${inf.hint ? `<br><span style="color:#b98cff">${inf.hint}</span>` : ''}`;
+  tip.style.display = 'block';
+  const sw = stage.clientWidth, tw = tip.offsetWidth, thh = tip.offsetHeight;
+  tip.style.left = Math.min(sw - tw - 8, x + 16) + 'px';
+  tip.style.top = Math.max(8, y - thh - 12) + 'px';
+}
+
+/* Información de cada equipo (tooltip + inspector) */
+function manif(kind) {
+  return { series: '💡 luz 5 % · 🔥 calor 95 %', lamp: '💡 luz 5 % · 🔥 calor 95 %', motor: '🔄 movimiento 85 % · 🔥 calor 15 %', alarm: '🔊 sonido + 💡 luz roja · casi todo 🔥 calor', cctv: '💡 luz de la pantalla · 🔥 calor' }[kind];
+}
+function info(id) {
+  const toolHint = { switch: 'Toca para encender/apagar', bulb: 'Toca para quitar/poner la bombilla', fault: 'Toca para provocar un cortocircuito', inspect: 'Toca para inspeccionar' }[st.tool];
+  if (LAMPS[id]) {
+    const L = LAMPS[id], c = CI[L.c];
+    return { title: `💡 ${L.name}${c.kind === 'series' ? ' (en serie)' : ' (en paralelo)'}`,
+      lines: [['Estado', !L.in ? 'bombilla retirada' : L.b > .004 ? 'encendida' : 'apagada'], ['Voltaje', fmtV(L.V)], ['Corriente', fmtA(L.I)], ['Potencia', fmtW(L.P) + ' de 100 W'], ['Brillo', Math.round(L.b * 100) + ' %'], ['Se transforma en', manif(c.kind)]],
+      hint: toolHint,
+      text: c.kind === 'series'
+        ? `Esta bombilla comparte un único camino con las otras dos. La corriente es la misma en las tres (${fmtA(c.I)}) y el voltaje se reparte: ${fmtV(L.V)} cada una. Como P = V²/R, con un tercio del voltaje da solo un noveno de la potencia: por eso brilla poco y anaranjada.`
+        : `Tiene su propio camino desde el tablero, así que recibe el voltaje completo (${fmtV(c.V)}). Si apagas o quitas otras luces, esta sigue igual: así funcionan los circuitos en paralelo.` };
+  }
+  const C5 = CI.C5, C6 = CI.C6, C7 = CI.C7;
+  switch (id) {
+    case 'res': return { title: '💧 Embalse', lines: [['Altura de caída', HEAD + ' m'], ['Caudal', st.Q + ' L/s'], ['Potencia del agua', fmtW(E.Ph)]], hint: toolHint, text: 'El agua acumulada en lo alto tiene energía potencial gravitatoria. Al caer, esa energía se convierte en movimiento. Potencia = ρ·g·Q·h.' };
+    case 'gate': return { title: '🚪 Compuerta', lines: [['Apertura', Math.round(st.Q / 40 * 100) + ' %'], ['Caudal', st.Q + ' L/s'], ['Potencia hidráulica', fmtW(E.Ph)]], hint: 'Toca para abrir/cerrar', text: 'Controla cuánta agua cae sobre la turbina. Más caudal = más energía disponible para la fábrica.' };
+    case 'wheel': return { title: '🌀 Turbina hidráulica', lines: [['Velocidad', Math.round(omega / (40 * 0.11) * 100) + ' % de la máxima'], ['Potencia mecánica', fmtW(E.Pm)], ['Eficiencia', '85 %']], hint: toolHint, text: 'El agua empuja las paletas y la rueda gira: la energía potencial se convierte en energía cinética de rotación (MOVIMIENTO).' };
+    case 'gen': return { title: '⚡ Generador', lines: [['Estado', st.genOn ? 'activo' : 'apagado'], ['Voltaje', fmtV(E.Vopen) + ' · 60 Hz'], ['Puede entregar', fmtW(E.Pav)], ['Entrega', fmtW(E.Ptot)]], hint: toolHint, text: 'El eje de la turbina hace girar imanes dentro de bobinas de cobre. Al moverse el campo magnético, los electrones del cobre se empujan: el MOVIMIENTO se convierte en energía ELÉCTRICA (inducción electromagnética).' };
+    case 'line': return { title: '〰 Línea eléctrica', lines: [['Voltaje', fmtV(E.Vopen)], ['Corriente', fmtA(E.Itot)], ['Potencia transportada', fmtW(E.Ptot)]], text: 'Los cables de cobre son conductores: dejan que la energía viaje del generador a la fábrica. Las partículas azules muestran el flujo; más corriente = flujo más rápido.' };
+    case 'cabinet': return { title: '🔲 Tablero de breakers', lines: [['Breaker principal', st.brkOn ? 'cerrado (ON)' : st.tripped ? 'DISPARADO' : 'abierto (OFF)'], ['Corriente total', fmtA(E.Itot)], ['Límite', I_BRK + ' A']], hint: toolHint, text: 'Es la puerta de entrada de la energía. Si lo abres, se corta toda la fábrica aunque el generador siga funcionando. Si la corriente supera 20 A (por ejemplo, un cortocircuito) se dispara solo para evitar incendios.' };
+    case 'motor': return { title: '⚙️ Motor y banda transportadora', lines: [['Voltaje', fmtV(C5.V)], ['Corriente', fmtA(C5.I)], ['Potencia', fmtW(C5.P)], ['Velocidad', Math.round(motorSpd * 100) + ' %'], ['Paquetes fabricados', produced], ['Se transforma en', manif('motor')]], hint: toolHint, text: 'Dentro del motor, la corriente crea un campo magnético que empuja el rotor y lo hace girar: energía eléctrica → MOVIMIENTO. La banda lleva el material a la prensa, que lo convierte en paquetes.' };
+    case 'alarm': return { title: '🔔 Alarma de evacuación', lines: [['Estado', alarmActive ? 'SONANDO' : C6.on ? 'sin energía suficiente' : 'apagada'], ['Voltaje', fmtV(C6.V)], ['Potencia', fmtW(C6.P)], ['Se transforma en', manif('alarm')]], hint: toolHint, text: 'El parlante tiene una bobina pegada a una membrana: la corriente la hace vibrar y mueve el aire → SONIDO. La baliza giratoria convierte energía en LUZ roja. Al sonar, los operarios evacúan al punto de encuentro.' };
+    case 'cam': case 'monitor': return { title: id === 'cam' ? '📹 Cámara CCTV' : '📺 Monitor CCTV', lines: [['Estado', cctvActive ? 'transmitiendo' : 'apagado'], ['Voltaje', fmtV(C7.V)], ['Potencia', fmtW(C7.P)], ['Se transforma en', manif('cctv')]], hint: toolHint, text: 'Circuito CERRADO de televisión: la cámara convierte la luz en una señal eléctrica que viaja por el cable de video (violeta) solo hasta este monitor, no se transmite al aire.' };
+  }
+  return { title: id, lines: [] };
+}
+
+/* =========================================================
+   Controles del panel
+   ========================================================= */
+const qIn = $('q');
+function setQ(v) { st.Q = v; qIn.value = v; $('qOut').textContent = v + ' L/s'; }
+qIn.addEventListener('input', () => { setQ(+qIn.value); if (st.Q > 0) st.lastQ = st.Q; });
+function toggleGen() { st.genOn = !st.genOn; sToggle(); syncUI(true); }
+function toggleBreaker() {
+  st.brkOn = !st.brkOn;
+  if (st.brkOn) { st.tripped = false; if (st.fault) toast('Subiste el breaker, pero el cable sigue en cortocircuito… ¡se va a disparar otra vez!'); }
+  sToggle(); syncUI(true);
+}
+for (const [id, fn] of [['swGen', toggleGen], ['swBrk', toggleBreaker]]) {
+  const el = $(id); el.addEventListener('click', fn);
+  el.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); fn(); } });
+}
+$('repair').addEventListener('click', () => { st.fault = null; sPlace(); toast('Cable reparado. Ahora sube el breaker principal para devolver la energía.', 'info'); syncUI(true); });
+
+// Lista de circuitos
+const circsEl = $('circs');
+circsEl.innerHTML = CIRC.map(c => `
+  <div class="circ" data-c="${c.id}">
+    <span class="cdot" style="--c:${c.col}"></span>
+    <div><b>${c.icon} ${c.name}</b><small>${c.tag}</small><span class="rd" id="rd-${c.id}">—</span>
+      ${c.lamps ? `<div class="bulbs">${c.lamps.map(l => `<button data-b="${l}" title="Quitar o poner esta bombilla">${l.length === 2 && l[0] === 'S' ? l : '💡'}</button>`).join('')}</div>` : ''}
+    </div>
+    <button class="mini" data-sw="${c.id}" role="switch" aria-label="Interruptor ${c.name}"></button>
+  </div>`).join('');
+circsEl.addEventListener('click', e => {
+  const sw = e.target.closest('[data-sw]'), bb = e.target.closest('[data-b]'), row = e.target.closest('[data-c]');
+  if (sw) { const c = CI[sw.dataset.sw]; c.on = !c.on; sToggle(); syncUI(true); return; }
+  if (bb) { const L = LAMPS[bb.dataset.b]; L.in = !L.in; sPlace(); syncUI(true); return; }
+  if (row) { const c = CI[row.dataset.c]; st.sel = c.lamps ? c.lamps[0] : { C5: 'motor', C6: 'alarm', C7: 'cam' }[c.id]; focusOn(pickOf(st.sel).ctr, 1.9); syncUI(true); }
+});
+
+// Herramientas
+$('tools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b) setTool(b.dataset.tool); });
+function setTool(t) {
+  st.tool = t;
+  document.querySelectorAll('#tools button').forEach(b => b.classList.toggle('on', b.dataset.tool === t));
+  const h = { switch: 'Toca un equipo para <b>encenderlo o apagarlo</b>', bulb: 'Toca una lámpara para <b>quitar o poner la bombilla</b>', inspect: 'Toca un equipo para <b>ver sus mediciones</b>', fault: 'Toca un equipo para <b>dañar su cable</b> (cortocircuito)' }[t];
+  $('hint').innerHTML = 'Arrastra: <b>rotar</b> · Rueda: <b>zoom</b> · ' + h;
+  sClick();
+}
+// Vistas
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+function setView(v) { camT.th = VIEWS[v][0]; camT.ph = VIEWS[v][1]; markView(v); sClick(); }
+function markView(v) { document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === v)); }
+function focusOn(c, z) { camT.cx = c[0]; camT.cy = c[1]; camT.zoom = z; }
+$('zIn').addEventListener('click', () => camT.zoom = clamp(camT.zoom * 1.25, .5, 4));
+$('zOut').addEventListener('click', () => camT.zoom = clamp(camT.zoom / 1.25, .5, 4));
+$('zHome').addEventListener('click', home);
+function home() { camT.cx = HOME.cx; camT.cy = HOME.cy; camT.zoom = HOME.zoom; }
+$('fsBtn').addEventListener('click', () => { if (!document.fullscreenElement) stage.requestFullscreen?.().catch(() => {}); else document.exitFullscreen?.(); });
+
+// Etiquetas (contrato de la skill)
+let labels = true;
+function setLabels(v) {
+  labels = v; st.labels = v; $('chkL').checked = v;
+  const b = $('lblBtn'); b.classList.toggle('on', v); b.setAttribute('aria-pressed', v);
+  stage.classList.toggle('clean', !v);
+  if (!v) hideTip();
+}
+$('lblBtn').addEventListener('click', () => setLabels(!labels));
+$('chkL').addEventListener('change', e => setLabels(e.target.checked));
+$('chkP').addEventListener('change', e => st.particles = e.target.checked);
+$('chkX').addEventListener('change', e => st.xray = e.target.checked);
+$('chkH').addEventListener('change', e => st.heat = e.target.checked);
+function setNight(v) { st.night = v; $('chkN').checked = v; }
+$('chkN').addEventListener('change', e => setNight(e.target.checked));
+$('chkS').addEventListener('change', e => { st.sound = e.target.checked; ensureAudio(); });
+$('seg').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (!b) return; st.pmode = b.dataset.m; $('seg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); if (st.pmode === 'ac') toast('En corriente alterna los electrones solo vibran de ida y vuelta (aquí en cámara lenta). No viajan hasta la bombilla: lo que viaja es la ENERGÍA.', 'info'); });
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' && e.target.type !== 'checkbox') return;
+  const k = e.key.toLowerCase();
+  if (k === 'e') setLabels(!labels);
+  else if (k === 'f') $('fsBtn').click();
+  else if (k === 'b') toggleBreaker();
+  else if (k === 'a') { CI.C6.on = !CI.C6.on; sToggle(); syncUI(true); }
+  else if (k === 'h') home();
+  else if (['1', '2', '3', '4'].includes(k)) setTool(['switch', 'bulb', 'inspect', 'fault'][+k - 1]);
+});
+
+/* Toast */
+let toastTimer = 0;
+function toast(msg, kind) {
+  const t = $('toast'); t.textContent = msg; t.className = 'toast show' + (kind ? ' ' + kind : '');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 4800);
+}
+
+/* =========================================================
+   Escenarios (presets)
+   ========================================================= */
+function base() {
+  st.genOn = true; setQ(25); st.lastQ = 25; st.brkOn = true; st.tripped = false; st.fault = null;
+  for (const c of CIRC) c.on = c.id !== 'C6';
+  for (const k in LAMPS) LAMPS[k].in = true;
+}
+const PRESETS = [
+  { n: '✅ Turno normal', d: 'Toda la planta funcionando', f() { base(); home(); } },
+  { n: '🚨 Simulacro', d: 'Alarma: luz, sonido y evacuación', f() { base(); CI.C6.on = true; CI.C5.on = false; focusOn([-2, 4], 1.4); } },
+  { n: '🔗 Serie vs paralelo', d: 'Compara el brillo de las luces', f() { base(); for (const c of CIRC) c.on = false; CI.C1.on = true; CI.C2.on = true; setNight(true); focusOn([-1.5, -2.5], 1.8); } },
+  { n: '💡 Bombilla retirada', d: 'Se abre el circuito en serie', f() { base(); LAMPS.S2.in = false; focusOn([-1.5, -6], 2.1); } },
+  { n: '⚡ Cortocircuito', d: 'El breaker protege la fábrica', f() { base(); st.fault = 'C5'; focusOn([0, 1], 1.3); } },
+  { n: '🏜️ Sequía', d: 'Poca agua: el voltaje cae', f() { base(); setQ(4); st.lastQ = 4; focusOn([-8, -3], 1.05); } },
+  { n: '⬛ Apagón', d: 'Breaker principal abierto', f() { base(); st.brkOn = false; focusOn([-4, 2], 1.4); } },
+  { n: '🧩 Planta vacía', d: 'Enciende tú cada circuito', f() { base(); for (const c of CIRC) c.on = false; home(); } }
+];
+$('presets').innerHTML = PRESETS.map((p, i) => `<button data-p="${i}"><b>${p.n}</b>${p.d}</button>`).join('');
+$('presets').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (!b) return; PRESETS[+b.dataset.p].f(); sPlace(); syncUI(true); });
+
+/* =========================================================
+   Recorrido guiado
+   ========================================================= */
+const TOUR = [
+  { t: '<b>1 · El embalse.</b> Todo empieza con agua guardada en lo alto. Por estar elevada tiene <b>energía potencial gravitatoria</b>. La compuerta amarilla decide cuánta agua cae (control “Caudal”).', c: [-23, -4], z: 1.8, hl: [-21, -5, 5.6, 1.4], th: 1.15, ph: .72 },
+  { t: '<b>2 · La turbina.</b> El agua cae y empuja las paletas amarillas: la energía potencial se convierte en <b>MOVIMIENTO</b> (energía cinética). Prueba bajar el caudal y mira cómo frena.', c: [-19, -4.5], z: 2.4, hl: [-19, -5, .05, 2.4], th: 2.75, ph: .6 },
+  { t: '<b>3 · El generador.</b> El eje de la turbina gira imanes dentro de bobinas de cobre. Eso empuja a los electrones: el movimiento se convierte en <b>energía ELÉCTRICA</b> a 220 V y 60 Hz.', c: [-19, -1.5], z: 2.3, hl: [-19, -1, .05, 2.2], th: .35, ph: .75 },
+  { t: '<b>4 · La línea eléctrica.</b> Los cables de cobre son <b>conductores</b>: llevan la energía hasta la fábrica. Las partículas azules muestran el flujo: más corriente, flujo más rápido.', c: [-11, 2.5], z: 1.6, hl: [-10, 3.3, .05, 1.2] },
+  { t: '<b>5 · El tablero de breakers.</b> Es la puerta de entrada. Si lo abres, toda la fábrica se apaga aunque el generador siga girando. Si la corriente pasa de 20 A, se dispara solo para evitar un incendio.', c: [-5, 5.5], z: 2.6, hl: [-5.65, 6.3, FZ + .02, 1.1] },
+  { t: '<b>6 · Circuito en SERIE.</b> Estas tres bombillas comparten <b>un solo camino</b>. El voltaje se reparte (≈73 V cada una) y brillan poco. Usa la herramienta 💡 para quitar una: ¡se apagan las tres!', c: [-1.5, -6.5], z: 2.2, hl: [-1.5, -7.5, FZ + .02, 3.6], act() { CI.C1.on = true; } },
+  { t: '<b>7 · Circuitos en PARALELO.</b> Todo lo demás tiene su <b>propio camino</b> desde el tablero y recibe los 220 V completos. Apaga la luz del pasillo: las demás siguen igual. Compara su brillo con las de la serie.', c: [3, 0], z: 1.25, hl: [-0.3, 3, FZ + .02, 1.6] },
+  { t: '<b>8 · MOVIMIENTO.</b> El motor convierte energía eléctrica en giro. La banda transporta el material y la prensa lo convierte en paquetes. Si baja el voltaje, el motor va más lento.', c: [10, -6], z: 2, hl: [8, -6, FZ + .02, 4.6], act() { CI.C5.on = true; } },
+  { t: '<b>9 · SONIDO y LUZ.</b> La alarma hace vibrar una membrana (sonido) y gira una baliza roja (luz). Al sonar, los operarios salen al punto de encuentro. ¿Qué pasaría si se va la luz? Por eso las alarmas reales tienen batería.', c: [-3, 5], z: 1.5, hl: [0.5, 7.5, FZ + .02, 1.3], act() { CI.C6.on = true; } },
+  { t: '<b>10 · Circuito cerrado de TV.</b> La cámara convierte la luz en señal eléctrica que viaja por el cable violeta solo hasta el monitor de la sala de control. Mira la imagen en el panel 📺.', c: [7, -9], z: 1.35, hl: [16.4, -11, FZ + .02, 1], act() { CI.C6.on = false; CI.C7.on = true; } },
+  { t: '<b>11 · Nada se pierde.</b> Toda la energía que entra se transforma en <b>luz, movimiento, sonido y calor</b>. Mira la barra “¿En qué se convierte la energía?”: ¡la mayor parte termina como calor (temperatura)!', c: HOME, z: 1, hl: null }
+];
+const tour = { on: false, i: 0 };
+$('tourDots').innerHTML = TOUR.map(() => '<i></i>').join('');
+function tourShow() {
+  const s = TOUR[tour.i];
+  if (s.act) s.act();
+  const c = s.c.cx !== undefined ? [s.c.cx, s.c.cy] : s.c;
+  focusOn(c, s.z); camT.th = s.th ?? VIEWS['3d'][0]; camT.ph = s.ph ?? VIEWS['3d'][1]; markView(s.th ? null : '3d');
+  $('capTxt').innerHTML = s.t; $('caption').style.display = 'block';
+  $('tourTxt').innerHTML = s.t;
+  $('tourGo').textContent = tour.i < TOUR.length - 1 ? `Siguiente (${tour.i + 1}/${TOUR.length})` : 'Terminar';
+  $('capNext').textContent = tour.i < TOUR.length - 1 ? 'Siguiente ▶' : 'Terminar ✓';
+  $('tourDots').querySelectorAll('i').forEach((d, k) => d.classList.toggle('on', k <= tour.i));
+  sPlace(); syncUI(true);
+}
+function tourNext() { if (!tour.on) { tour.on = true; tour.i = 0; } else if (tour.i < TOUR.length - 1) tour.i++; else return tourStop(); tourShow(); }
+function tourPrev() { if (tour.on && tour.i > 0) { tour.i--; tourShow(); } }
+function tourStop() {
+  tour.on = false; $('caption').style.display = 'none';
+  $('tourTxt').textContent = 'Sigue la energía paso a paso: del agua del embalse hasta la luz, el movimiento y el sonido dentro de la fábrica.';
+  $('tourGo').textContent = 'Iniciar recorrido';
+  $('tourDots').querySelectorAll('i').forEach(d => d.classList.remove('on'));
+}
+$('tourGo').addEventListener('click', tourNext); $('capNext').addEventListener('click', tourNext);
+$('capPrev').addEventListener('click', tourPrev); $('tourEnd').addEventListener('click', tourStop); $('capEnd').addEventListener('click', tourStop);
+
+/* =========================================================
+   ¿Sabías que…?
+   ========================================================= */
+const FACTS = [
+  'En Colombia cerca de dos tercios de la electricidad viene de centrales hidroeléctricas: el agua de los ríos andinos mueve turbinas como esta.',
+  'Hidroituango, en Antioquia, está diseñada para 2.400 MW: la energía de 24 millones de bombillas de 100 W encendidas al tiempo.',
+  'En Colombia la corriente de los enchufes es alterna a 60 Hz: los electrones van y vienen 60 veces por segundo. Avanzan menos de 1 mm por segundo, ¡pero la energía viaja casi a la velocidad de la luz!',
+  'Una bombilla incandescente convierte solo cerca del 5 % de la energía en luz; el otro 95 % se vuelve calor. Por eso los LED ahorran tanto.',
+  'Michael Faraday descubrió en 1831 que mover un imán cerca de una bobina de cobre produce corriente eléctrica. Todos los generadores del mundo usan esa idea.',
+  'La energía no se crea ni se destruye, solo se transforma. Aquí: potencial (agua) → movimiento (turbina) → eléctrica (generador) → luz, movimiento, sonido y calor.',
+  'Las antiguas luces de Navidad estaban conectadas en serie: si se quemaba un solo bombillo, se apagaba toda la tira.',
+  'Un breaker detecta el exceso de corriente con un electroimán o con una lámina bimetálica que se dobla al calentarse, y abre el circuito en milésimas de segundo.'
+];
+let factI = 0;
+function showFact() { $('fact').textContent = FACTS[factI % FACTS.length]; }
+$('factNext').addEventListener('click', () => { factI++; showFact(); });
+showFact();
+
+/* =========================================================
+   Actualización del panel (10 veces por segundo)
+   ========================================================= */
+let lastDiag = '', uiT = 0;
+function syncUI(force) {
+  // switches
+  const g = $('swGen'); g.classList.toggle('on', st.genOn); g.setAttribute('aria-checked', st.genOn);
+  $('genTxt').textContent = !st.genOn ? 'Apagado' : E.Vopen < 1 ? 'Sin agua: la turbina no gira' : `${fmtV(E.Vopen)} · 60 Hz · puede dar ${fmtW(E.Pav)}`;
+  const b = $('swBrk'); b.classList.toggle('on', st.brkOn); b.classList.toggle('trip', st.tripped); b.setAttribute('aria-checked', st.brkOn);
+  $('brkTxt').textContent = st.brkOn ? `Cerrado · ${fmtA(E.Itot)} de ${I_BRK} A` : st.tripped ? '¡Disparado por sobrecorriente!' : 'Abierto: fábrica sin energía';
+  $('repair').style.display = st.fault ? 'block' : 'none';
+  // tarjetas
+  $('cV').textContent = fmtV(E.Vbus); $('cV2').textContent = E.sag ? 'caída por falta de agua' : st.brkOn ? 'tablero → circuitos' : 'breaker abierto';
+  $('cI').textContent = fmtA(E.Itot); $('cI2').textContent = 'I = V / R';
+  $('cR').textContent = fmtR(E.Req);
+  $('cP').textContent = fmtW(E.Ptot); $('cP2').textContent = 'P = V × I';
+  // cadena
+  const mx = Math.max(E.Ph, 1);
+  const row = (lab, val, col, sub) => `<div class="row"><span>${lab}</span><div class="bar"><i style="width:${clamp(val / mx * 100, 0, 100)}%;background:${col}"></i></div><b>${fmtW(val)}</b></div>`;
+  $('chain').innerHTML =
+    row('💧 Agua (potencial)', E.Ph, '#3fc1ff') +
+    row('🌀 Turbina (mov.)', E.Pm, '#7fd8ff') +
+    row('⚡ Generador', E.Pav, '#ffe14d') +
+    row('🏭 Fábrica usa', E.Ptot, '#3ee08f') +
+    `<div class="note">P = ρ·g·Q·h = 1000 × 9.81 × ${(st.Q / 1000).toFixed(3)} m³/s × ${HEAD} m. ${E.sag ? '<b style="color:#ffb13b">La fábrica pide más de lo que da el agua: el voltaje baja.</b>' : E.Ptot > 0 ? 'El sobrante se va por el vertedero.' : ''}</div>`;
+  // manifestaciones
+  const tot = E.light + E.move + E.sound + E.heat || 1;
+  const ms = [['💡 Luz', E.light, '#ffe14d'], ['🔄 Movimiento', E.move, '#3ee08f'], ['🔊 Sonido', E.sound, '#b98cff'], ['🔥 Calor', E.heat, '#ff5a6a']];
+  $('mbar').innerHTML = E.Ptot > 0.5 ? ms.map(([, v, c]) => `<i style="width:${v / tot * 100}%;background:${c}"></i>`).join('') : '';
+  $('mleg').innerHTML = ms.map(([n, v, c]) => `<div><span class="sq" style="background:${c}"></span>${n}<b>${fmtW(v)}</b></div>`).join('');
+  // circuitos
+  for (const c of CIRC) {
+    const rd = $('rd-' + c.id), row2 = circsEl.querySelector(`[data-c="${c.id}"]`);
+    row2.querySelector('.mini').classList.toggle('on', c.on);
+    row2.querySelector('.mini').setAttribute('aria-checked', c.on);
+    const open = c.lamps && c.lamps.some(l => !LAMPS[l].in);
+    rd.textContent = !c.on ? 'Interruptor abierto' : !st.brkOn ? 'Sin energía (breaker)' : open ? 'Circuito abierto: falta una bombilla' : `${fmtV(c.V)} · ${fmtA(c.I)} · ${fmtW(c.P)}`;
+    rd.classList.toggle('off', !c.closed || c.P < 0.1);
+    if (c.lamps) row2.querySelectorAll('[data-b]').forEach(x => x.classList.toggle('out', !LAMPS[x.dataset.b].in));
+    const sid = c.lamps ? c.lamps : [{ C5: 'motor', C6: 'alarm', C7: 'cam' }[c.id]];
+    row2.classList.toggle('sel', sid.includes(st.sel) || (c.id === 'C7' && st.sel === 'monitor'));
+  }
+  // inspector
+  if (st.sel) {
+    const inf = info(st.sel);
+    $('insp').innerHTML = `<b>${inf.title}</b><div class="kv">${inf.lines.map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('')}</div>${inf.text || ''}`;
+  }
+  // diagnóstico
+  const d = diagnose().map(([c, h]) => `<li class="${c}"><div>${h}</div></li>`).join('');
+  if (d !== lastDiag) { $('diag').innerHTML = d; lastDiag = d; }
+  // evacuación
+  const ev = $('evac');
+  if (alarmActive) { const n = WORKERS.filter(w => w.d >= w.len - .05).length; ev.style.display = 'block'; $('evacN').textContent = `${n}/${WORKERS.length} en el punto de encuentro`; }
+  else ev.style.display = 'none';
+}
+function diagnose() {
+  const m = [];
+  if (!st.genOn) m.push(['bad', '<b>Generador apagado.</b> Sin fuente no hay energía para nada: la energía no aparece sola, viene del agua que cae.']);
+  else if (st.Q === 0) m.push(['bad', '<b>Compuerta cerrada.</b> Sin caída de agua la turbina se detiene y el generador deja de producir. Abre el caudal.']);
+  if (st.fault && st.brkOn) m.push(['bad', `<b>¡Cortocircuito en ${CI[st.fault].name}!</b> El cable dañado ofrece casi 0 Ω, así que la corriente se dispara (${Math.round(E.Itot)} A). El breaker está a punto de abrir.`]);
+  if (st.tripped) m.push(['bad', `<b>El breaker se disparó.</b> Detectó más de ${I_BRK} A y cortó la energía para que los cables no se recalienten. ${st.fault ? 'Repara el cable antes de volver a subirlo.' : 'Ya puedes volver a subirlo.'}`]);
+  else if (!st.brkOn) m.push(['warn', '<b>Breaker principal abierto.</b> El generador sí produce voltaje (cable de la línea encendido), pero el tablero no deja pasar la corriente: toda la fábrica queda apagada.']);
+  if (E.sag && E.Vbus > 1 && !st.fault) m.push(['warn', `<b>Falta agua.</b> La fábrica pediría ${fmtW(E.Vopen * E.Vopen / E.Req)} pero el agua solo da ${fmtW(E.Pav)}. El voltaje baja a ${fmtV(E.Vbus)}: las luces se ven más débiles y el motor va más lento.`]);
+  if (st.genOn && st.Q > 0 && st.brkOn && !E.sag && !st.fault && E.Vbus > 1) m.push(['ok', `<b>Energía estable.</b> El tablero entrega ${fmtV(E.Vbus)} a cada circuito en paralelo. Corriente total: ${fmtA(E.Itot)} (suma de todas las ramas).`]);
+  if (E.Vbus > 1 && E.Itot < 0.005) m.push(['info', '<b>Hay voltaje pero no corriente.</b> Todos los interruptores están abiertos: la energía “espera” en los cables. Sin un camino cerrado no circula nada.']);
+  const c1 = CI.C1, out = c1.lamps.filter(l => !LAMPS[l].in);
+  if (c1.on && st.brkOn && E.Vbus > 1) {
+    if (out.length) m.push(['warn', `<b>Serie abierta:</b> falta ${out.join(', ')}. En serie hay un solo camino; si se rompe en un punto, <b>todas</b> se apagan.`]);
+    else m.push(['info', `<b>Serie:</b> 3 × 484 Ω = 1452 Ω. I = ${fmtV(E.Vbus)} / 1452 Ω = ${fmtA(c1.I)}. Cada bombilla recibe ${fmtV(LAMPS.S1.V)} y da solo ${fmtW(LAMPS.S1.P)} (1/9 de su potencia).`]);
+  }
+  const par = ['C2', 'C3', 'C4'].map(id => CI[id]).filter(c => c.closed && c.lamps.every(l => LAMPS[l].in));
+  if (par.length && c1.closed) m.push(['info', `<b>Compara:</b> en paralelo cada luz recibe ${fmtV(E.Vbus)} y da ${fmtW(par[0].P)}; en serie cada una da ${fmtW(LAMPS.S1.P)}. ¡Por eso brillan distinto!`]);
+  if (CI.C6.on && !alarmActive) m.push(['warn', '<b>La alarma está encendida pero no suena:</b> no le llega energía. Por eso las alarmas reales tienen batería de respaldo.']);
+  if (alarmActive) m.push(['info', '<b>Alarma activa:</b> la bobina del parlante vibra y produce SONIDO; la baliza produce LUZ roja. Los operarios evacúan al punto de encuentro.']);
+  if (st.pmode === 'ac') m.push(['info', '<b>Modo electrones:</b> en corriente alterna los electrones solo oscilan en su sitio. Lo que llega hasta las máquinas es la energía, transportada por el campo eléctrico.']);
+  return m.slice(0, 6);
+}
+
+/* =========================================================
+   Sonido (Web Audio API)
+   ========================================================= */
+let AC = null, siren = null, hum = null;
+function ensureAudio() { if (!AC && st.sound) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } } if (AC && AC.state === 'suspended') AC.resume(); }
+function tone(freq, dur, type = 'sine', vol = 0.12, glide) {
+  if (!st.sound) return; ensureAudio(); if (!AC) return;
+  const o = AC.createOscillator(), g = AC.createGain(), t0 = AC.currentTime;
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  if (glide) o.frequency.exponentialRampToValueAtTime(Math.max(20, glide), t0 + dur);
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(AC.destination); o.start(t0); o.stop(t0 + dur + .02);
+}
+const sClick = () => tone(1400, .05, 'square', .05);
+const sToggle = () => { tone(700, .06, 'triangle', .08); setTimeout(() => tone(1050, .07, 'triangle', .08), 55); };
+const sPlace = () => { tone(700, .06, 'triangle', .08); setTimeout(() => tone(1050, .07, 'triangle', .08), 55); };
+const sPop = () => tone(220, .35, 'sawtooth', .14, 40);
+const sBuzz = () => tone(90, .5, 'sawtooth', .1, 60);
+function updateAudio() {
+  const want = st.sound && AC && alarmActive;
+  if (want && !siren) {
+    const o = AC.createOscillator(), g = AC.createGain(), l = AC.createOscillator(), lg = AC.createGain();
+    o.type = 'sawtooth'; o.frequency.value = 820; l.frequency.value = 0.8; lg.gain.value = 300;
+    l.connect(lg); lg.connect(o.frequency); g.gain.value = 0; o.connect(g); g.connect(AC.destination);
+    o.start(); l.start(); g.gain.setTargetAtTime(0.035, AC.currentTime, .05); siren = { o, g, l };
+  } else if (!want && siren) { const s = siren; siren = null; s.g.gain.setTargetAtTime(0, AC.currentTime, .05); s.o.stop(AC.currentTime + .3); s.l.stop(AC.currentTime + .3); }
+  const wantHum = st.sound && AC && motorSpd > 0.05;
+  if (wantHum && !hum) {
+    const o = AC.createOscillator(), g = AC.createGain(); o.type = 'triangle'; o.frequency.value = 60; g.gain.value = 0; o.connect(g); g.connect(AC.destination); o.start(); hum = { o, g };
+  }
+  if (hum) {
+    if (!wantHum) { const h = hum; hum = null; h.g.gain.setTargetAtTime(0, AC.currentTime, .05); h.o.stop(AC.currentTime + .3); }
+    else { hum.o.frequency.setTargetAtTime(40 + 80 * motorSpd, AC.currentTime, .1); hum.g.gain.setTargetAtTime(0.02 * motorSpd, AC.currentTime, .1); }
+  }
+}
+
+/* =========================================================
+   Bucle principal
+   ========================================================= */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const k = 1 - Math.pow(0.0025, dt);
+  cam.th += angDiff(camT.th, cam.th) * k; cam.ph += (camT.ph - cam.ph) * k;
+  cam.zoom += (camT.zoom - cam.zoom) * k; cam.cx += (camT.cx - cam.cx) * k; cam.cy += (camT.cy - cam.cy) * k;
+  ambT = st.night ? 0.42 : 1; amb += (ambT - amb) * Math.min(1, dt * 3);
+  solve(dt);
+  simulate(dt);
+  drawFeed();
+  render();
+  mctx.drawImage(feed, 0, 0, mon.width, mon.height);
+  uiT += dt; if (uiT > 0.1) { uiT = 0; syncUI(); }
+  updateAudio();
+  requestAnimationFrame(frame);
+}
+buildScene();
+buildEdges();
+syncUI(true);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
